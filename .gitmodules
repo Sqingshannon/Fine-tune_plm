@@ -1,3 +1,6 @@
 [submodule "spurs"]
 	path = spurs
 	url = https://github.com/Sqingshannon/SPURS.git
+[submodule "psifit"]
+	path = psifit
+	url = https://github.com/Sqingshannon/PsiFit.git
