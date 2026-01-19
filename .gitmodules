@@ -1,0 +1,3 @@
+[submodule "spurs"]
+	path = spurs
+	url = https://github.com/Sqingshannon/SPURS.git
