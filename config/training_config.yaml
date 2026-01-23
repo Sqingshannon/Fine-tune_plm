@@ -1,8 +1,8 @@
-model: ESM-2
-gpu_number: 4
-shot: 48
+model: ESM-1v
+gpu_number: 2
+shot: 96
 batch_size: 16
-max_epochs: 30
+max_epochs: 20
 ini_lr: 5e-4
 min_lr: 1e-4
 endure_time: 5

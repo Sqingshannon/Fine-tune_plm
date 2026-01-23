@@ -61,7 +61,6 @@ def sample_data(dataset_name, seed, shot, frac=0.2):
     :param frac: the fraction of testing data, default to 0.2
     :param shot: the size of training data
     '''
-
     data = pd.read_csv(f'data/{dataset_name}/data.csv', index_col=0)
     test_data = data.sample(frac=frac, random_state=seed)
     train_data = data.drop(test_data.index)

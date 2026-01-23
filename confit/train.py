@@ -98,7 +98,6 @@ def main():
     parser.add_argument('--model_seed', type=int, default=1, help='the random seed for the pretrained model initiate')
 
     args, _ = parser.parse_known_args()
-    
     dataset = args.dataset
 
     #read in config
@@ -164,7 +163,6 @@ def main():
                 val_csv = pd.read_csv(f'data/{dataset}/train_{i}.csv')   #using 1/5 train data as validation set
             temp_csv = pd.read_csv(f'data/{dataset}/train_{i}.csv')
             train_csv = pd.concat([train_csv, temp_csv], axis=0)
-
 
     #creat dataset and dataloader
     trainset = Mutation_Set(data=train_csv, fname=dataset, tokenizer=tokenizer)
