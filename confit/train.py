@@ -96,7 +96,9 @@ def main():
     parser.add_argument('--dataset', type=str, help='the dataset name')
     parser.add_argument('--sample_seed', type=int, default=0, help='the sample seed for dataset')
     parser.add_argument('--model_seed', type=int, default=1, help='the random seed for the pretrained model initiate')
-    args = parser.parse_args()
+
+    args, _ = parser.parse_known_args()
+    
     dataset = args.dataset
 
     #read in config

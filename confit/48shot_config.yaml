@@ -1,0 +1,13 @@
+# 48shot_config.yaml   ← put this file in the confit folder
+model: ESM-1b
+batch_size: 8            
+gpu_number: 1
+lora_r: 8
+lora_alpha: 16
+lora_dropout: 0.05
+ini_lr: 0.0001
+min_lr: 0.00001
+max_epochs: 30
+lambda_reg: 0.1
+shot: 48
+endure_time: 5
