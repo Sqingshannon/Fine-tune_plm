@@ -158,11 +158,13 @@ def main():
     with accelerator.main_process_first():
         train_csv = pd.DataFrame(None)
         test_csv = pd.read_csv(f'data/{dataset}/test.csv')
+        val_csv = None
         for i in range(1, 6):
-            if i == args.model_seed:
-                val_csv = pd.read_csv(f'data/{dataset}/train_{i}.csv')   #using 1/5 train data as validation set
             temp_csv = pd.read_csv(f'data/{dataset}/train_{i}.csv')
-            train_csv = pd.concat([train_csv, temp_csv], axis=0)
+            if i == args.model_seed:
+                val_csv = temp_csv
+            else:
+                train_csv = pd.concat([train_csv, temp_csv], axis=0)
 
     #creat dataset and dataloader
     trainset = Mutation_Set(data=train_csv, fname=dataset, tokenizer=tokenizer)
