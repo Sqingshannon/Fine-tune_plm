@@ -19,6 +19,8 @@ import time
 import yaml
 warnings.filterwarnings("ignore")
 
+from data_check import data_restruct
+
 
 
 def train(model, model_reg, trainloder, optimizer, tokenizer, lambda_reg):
@@ -152,6 +154,7 @@ def main():
 
     # sample data
     if accelerator.is_main_process:
+        data_restruct(dms_id=dataset)
         sample_data(dataset, args.sample_seed, int(config['shot']))
         split_train(dataset)
 
