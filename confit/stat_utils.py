@@ -18,7 +18,7 @@ def compute_stat(sr):
     return mean, std
 
 
-def compute_score(model, seq, mask, wt, pos, tokenizer):
+def compute_score(model, seq, mask, wt, pos, tokenizer, spurs_ddg, aa_token_ids):
     '''
     compute mutational proxy using masked marginal probability
     :param seq:mutant seq
@@ -41,6 +41,27 @@ def compute_score(model, seq, mask, wt, pos, tokenizer):
 
     out = model(mask_seq, mask, output_hidden_states=True)
     logits = out.logits
+    
+    A = 0.1
+    b = 0.1
+    A2 = 0.1
+    b2 = 0.1
+    A = torch.tensor(A).to(device)
+    b = torch.tensor(b).to(device)
+    A2 = torch.tensor(A2).to(device)
+    b2 = torch.tensor(b2).to(device)
+    
+    seq_len = mask_seq.shape[1] - 2
+    aligned_ddg = spurs_ddg.unsqueeze(0).to(device)
+    scaled_ddg = A * aligned_ddg + b
+    aligned_logits = logits[:, 1:seq_len + 1, aa_token_ids]
+    adjusted_logits = aligned_logits + scaled_ddg
+    aligned_logits = A2 * adjusted_logits + b2
+    logits[:, 1:seq_len + 1, aa_token_ids] = aligned_logits
+    
+    print("logits after spurs adjustment used")
+    
+    
     log_probs = torch.log_softmax(logits, dim=-1)
     scores = torch.zeros(batch_size)
     scores = scores.to(device)

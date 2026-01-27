@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import pandas as pd
@@ -20,10 +21,40 @@ import yaml
 warnings.filterwarnings("ignore")
 
 from data_check import data_restruct
+import random
 
+class PsiFit(nn.Module):
+    def __init__(self, esm_model, spurs_ddg, aa_token_ids):
+        super(PsiFit, self).__init__()
+        self.esm = esm_model
+        device = next(self.esm.parameters()).device
+        self.A = nn.Parameter(torch.tensor(0.1))
+        self.b = nn.Parameter(torch.tensor(0.1))
+        
+        self.A2 = nn.Parameter(torch.tensor(0.1))
+        self.b2 = nn.Parameter(torch.tensor(0.1))
+        
+        self.spurs_ddg = spurs_ddg.to(device)
+        self.aa_token_ids = aa_token_ids
+        
+    def forward(self, input_ids, attention_mask=None):
+        outputs = self.esm(input_ids=input_ids, attention_mask=attention_mask)
+        logits = outputs.logits
 
+        seq_len = input_ids.shape[1] - 2
+        aligned_ddg = self.spurs_ddg.unsqueeze(0).to(logits.device)
+        scaled_ddg = self.A * aligned_ddg + self.b
+        
+        aligned_logits = logits[:, 1:seq_len+1, self.aa_token_ids]
+        adjusted_logits = aligned_logits + scaled_ddg
+        
+        aligned_logits = self.A2 * adjusted_logits + self.b2
+        
+        logits[:, 1:seq_len+1, self.aa_token_ids] = aligned_logits
+        outputs.logits = logits
+        return outputs
 
-def train(model, model_reg, trainloder, optimizer, tokenizer, lambda_reg):
+def train(model, model_reg, trainloder, optimizer, tokenizer, lambda_reg, spurs_ddg, aa_token_ids):
 
     model.train()
 
@@ -34,7 +65,7 @@ def train(model, model_reg, trainloder, optimizer, tokenizer, lambda_reg):
         wt, wt_mask = data[2], data[3]
         pos = data[4]
         golden_score = data[5]
-        score, logits = compute_score(model, seq, mask, wt, pos, tokenizer)
+        score, logits = compute_score(model, seq, mask, wt, pos, tokenizer, spurs_ddg, aa_token_ids)
         score = score.cuda()
 
         l_BT = BT_loss(score, golden_score)
@@ -52,7 +83,7 @@ def train(model, model_reg, trainloder, optimizer, tokenizer, lambda_reg):
     return total_loss
 
 
-def evaluate(model, testloader, tokenizer, accelerator, istest=False):
+def evaluate(model, testloader, tokenizer, accelerator, spurs_ddg, aa_token_ids, istest=False):
     model.eval()
     seq_list = []
     score_list = []
@@ -70,7 +101,7 @@ def evaluate(model, testloader, tokenizer, accelerator, istest=False):
                 for s in pid:
                     seq_list.append(s.cpu())
 
-            score, logits = compute_score(model, seq, mask, wt, pos, tokenizer)
+            score, logits = compute_score(model, seq, mask, wt, pos, tokenizer, spurs_ddg, aa_token_ids)
 
             score = score.cuda()
             score = accelerator.gather(score)
@@ -101,6 +132,13 @@ def main():
 
     args, _ = parser.parse_known_args()
     dataset = args.dataset
+    
+    np.random.seed(args.sample_seed)
+    random.seed(args.sample_seed)
+    torch.manual_seed(args.model_seed)
+    torch.cuda.manual_seed_all(args.model_seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
     #read in config
     with open(f'{args.config}', 'r', encoding='utf-8') as f:
@@ -110,6 +148,7 @@ def main():
 
 
     accelerator = Accelerator()
+    # accelerator.set_seed(args.model_seed)
 
     ### creat model
     if config['model'] == 'ESM-1v':
@@ -126,6 +165,14 @@ def main():
         basemodel = EsmForMaskedLM.from_pretrained('facebook/esm1b_t33_650M_UR50S')
         model_reg = EsmForMaskedLM.from_pretrained('facebook/esm1b_t33_650M_UR50S')
         tokenizer = EsmTokenizer.from_pretrained('facebook/esm1b_t33_650M_UR50S')
+
+    aa_tokens = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y']
+    aa_token_ids = tokenizer.convert_tokens_to_ids(aa_tokens)
+    aa_token_ids = torch.tensor(aa_token_ids)
+    spurs_ddg = torch.tensor([0.0] * len(aa_tokens))
+    
+    # esm_model = basemodel
+    # basemodel = PsiFit(esm_model, spurs_ddg, aa_token_ids)
 
     for pm in model_reg.parameters():
         pm.requires_grad = False
@@ -191,9 +238,9 @@ def main():
     best_epoch = 0
 
     for epoch in range(int(config['max_epochs'])):
-        loss = train(model, model_reg, trainloader, optimizer, tokenizer, float(config['lambda_reg']))
+        loss = train(model, model_reg, trainloader, optimizer, tokenizer, float(config['lambda_reg']), spurs_ddg, aa_token_ids)
         accelerator.print(f'========epoch{epoch}; training loss :{loss}=================')
-        sr = evaluate(model, valloader, tokenizer, accelerator)
+        sr = evaluate(model, valloader, tokenizer, accelerator, spurs_ddg, aa_token_ids)
         accelerator.print(f'========epoch{epoch}; val spearman correlation :{sr}=================')
         scheduler.step()
         if best_sr > sr:
@@ -237,9 +284,11 @@ def main():
         basemodel = EsmForMaskedLM.from_pretrained('facebook/esm1b_t33_650M_UR50S')
         tokenizer = EsmTokenizer.from_pretrained('facebook/esm1b_t33_650M_UR50S')
 
+    # basemodel = PsiFit(esm_model, spurs_ddg, aa_token_ids)
+    
     model = PeftModel.from_pretrained(basemodel, save_path)
     model = accelerator.prepare(model)
-    sr, score, pid = evaluate(model, testloader, tokenizer, accelerator, istest=True)
+    sr, score, pid = evaluate(model, testloader, tokenizer, accelerator, spurs_ddg, aa_token_ids, istest=True)
     pred_csv = pd.DataFrame({f'{args.model_seed}': score, 'PID': pid})
     if accelerator.is_main_process:
         if not os.path.isdir(f'predicted/{dataset}'):

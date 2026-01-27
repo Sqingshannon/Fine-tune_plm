@@ -5,7 +5,7 @@ import os
 from Bio import SeqIO
 
 def data_restruct(dms_id, input_dir=Path("/work/yunan/PsiFit/data/proteingym"), output_base=Path("./data")):
-    predicted_dir = Path("/data/predicted") / dms_id
+    predicted_dir = Path("//predicted") / dms_id
     if predicted_dir.exists():
         shutil.rmtree(predicted_dir)
     else:
@@ -49,9 +49,11 @@ def data_restruct(dms_id, input_dir=Path("/work/yunan/PsiFit/data/proteingym"), 
             return ','.join(map(str, positions))
     df['mutated_position'] = df['mutant'].apply(extract_positions)
     
+    df['n_mut'] = df['mutant'].apply(lambda x: len(x.split(':')))
+    
     df['PID'] = df.index.astype(str)
     
-    relevant_cols = ['seq', 'log_fitness', 'PID', 'mutated_position', 'mutant']
+    relevant_cols = ['seq', 'log_fitness', 'n_mut', 'mutant', 'PID', 'mutated_position']
     df = df[relevant_cols]
     
     df.to_csv(output_dms_dir / "test.csv", index=True)
