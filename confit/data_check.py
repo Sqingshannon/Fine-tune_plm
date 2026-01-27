@@ -5,7 +5,7 @@ import os
 from Bio import SeqIO
 
 def data_restruct(dms_id, input_dir=Path("/work/yunan/PsiFit/data/proteingym"), output_base=Path("./data")):
-    predicted_dir = Path("//predicted") / dms_id
+    predicted_dir = Path("./predicted") / dms_id
     if predicted_dir.exists():
         shutil.rmtree(predicted_dir)
     else:
@@ -22,6 +22,7 @@ def data_restruct(dms_id, input_dir=Path("/work/yunan/PsiFit/data/proteingym"), 
     df = pd.read_csv(input_dir / dms_id / "proteingym_dms.tsv", sep='\t')
     
     shutil.copy(input_dir / dms_id / "wildtype.fasta", output_dms_dir / "wt.fasta")
+    shutil.copy(input_dir / dms_id / "spurs_prediction.tsv", output_dms_dir / "spurs_prediction.tsv")
     
     if 'mutated_sequence' not in df.columns:
         def apply_mutations(mutant):
@@ -55,6 +56,11 @@ def data_restruct(dms_id, input_dir=Path("/work/yunan/PsiFit/data/proteingym"), 
     
     relevant_cols = ['seq', 'log_fitness', 'n_mut', 'mutant', 'PID', 'mutated_position']
     df = df[relevant_cols]
+    
+    
+    # spurs_ddg = pd.read_csv(input_dir / dms_id / "spurs_prediction.tsv")
+    
+    # spurs_ddg.to_csv(output_dms_dir / "spurs_prediction.tsv", index=False)
     
     df.to_csv(output_dms_dir / "test.csv", index=True)
     df.to_csv(output_dms_dir / "data.csv", index=True)

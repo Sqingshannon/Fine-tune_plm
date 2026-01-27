@@ -4,6 +4,8 @@ import pandas as pd
 from scipy.stats import spearmanr
 from scipy import stats
 
+import torch.nn.functional as F
+
 
 def spearman(y_pred, y_true):
     if np.var(y_pred) < 1e-6 or np.var(y_true) < 1e-6:
@@ -42,24 +44,42 @@ def compute_score(model, seq, mask, wt, pos, tokenizer, spurs_ddg, aa_token_ids)
     out = model(mask_seq, mask, output_hidden_states=True)
     logits = out.logits
     
-    A = 0.1
-    b = 0.1
-    A2 = 0.1
-    b2 = 0.1
+    A = 1
+    # b = 0.1
+    # A2 = 0.1
+    # b2 = 0.1
     A = torch.tensor(A).to(device)
-    b = torch.tensor(b).to(device)
-    A2 = torch.tensor(A2).to(device)
-    b2 = torch.tensor(b2).to(device)
+    # b = torch.tensor(b).to(device)
+    # A2 = torch.tensor(A2).to(device)
+    # b2 = torch.tensor(b2).to(device)
+    
+    # # A = A.to(device)
+    # # b = b.to(device)
+    # # A2 = A2.to(device)
+    # # b2 = b2.to(device)
     
     seq_len = mask_seq.shape[1] - 2
-    aligned_ddg = spurs_ddg.unsqueeze(0).to(device)
-    scaled_ddg = A * aligned_ddg + b
-    aligned_logits = logits[:, 1:seq_len + 1, aa_token_ids]
-    adjusted_logits = aligned_logits + scaled_ddg
-    aligned_logits = A2 * adjusted_logits + b2
-    logits[:, 1:seq_len + 1, aa_token_ids] = aligned_logits
     
-    print("logits after spurs adjustment used")
+    # out.logits.shape == [2, 1024, 20]
+    
+    # print("spurs_ddg shape:", spurs_ddg.shape)
+    # if spurs_ddg.shape[0] != seq_len:
+    #     if spurs_ddg.shape[0] < seq_len:
+    #         pad_size = seq_len - spurs_ddg.shape[0]
+    #         spurs_ddg = F.pad(spurs_ddg, (0, 0, 0, pad_size), mode='constant', value=0.0)
+    #     else:
+    #         spurs_ddg = spurs_ddg[:seq_len, :]
+    
+    aligned_ddg = spurs_ddg.unsqueeze(0).expand(batch_size, -1, -1).to(device)
+    # print("aligned_ddg shape:", aligned_ddg.shape)
+    scaled_ddg = A * aligned_ddg
+    aligned_logits = logits[:, 1:seq_len + 1, aa_token_ids]
+    # print("aligned_logits shape:", aligned_logits.shape)
+    adjusted_logits = aligned_logits + scaled_ddg
+    # aligned_logits = A2 * adjusted_logits + b2
+    logits[:, 1:seq_len + 1, aa_token_ids] = adjusted_logits
+    
+    # print("logits after spurs adjustment used")
     
     
     log_probs = torch.log_softmax(logits, dim=-1)

@@ -133,6 +133,8 @@ def main():
     args, _ = parser.parse_known_args()
     dataset = args.dataset
     
+    data_restruct(dms_id=dataset)
+    
     np.random.seed(args.sample_seed)
     random.seed(args.sample_seed)
     torch.manual_seed(args.model_seed)
@@ -169,10 +171,16 @@ def main():
     aa_tokens = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y']
     aa_token_ids = tokenizer.convert_tokens_to_ids(aa_tokens)
     aa_token_ids = torch.tensor(aa_token_ids)
-    spurs_ddg = torch.tensor([0.0] * len(aa_tokens))
+    spurs_ddg = pd.read_csv(f'data/{dataset}/spurs_prediction.tsv', sep='\t', index_col=0)
+    spurs_ddg = torch.tensor(spurs_ddg.values, dtype=torch.float32)
     
     # esm_model = basemodel
     # basemodel = PsiFit(esm_model, spurs_ddg, aa_token_ids)
+    
+    # A = nn.Parameter(torch.tensor(0.1, device=accelerator.device))
+    # b = nn.Parameter(torch.tensor(0.1, device=accelerator.device))
+    # A2 = nn.Parameter(torch.tensor(0.1, device=accelerator.device))
+    # b2 = nn.Parameter(torch.tensor(0.1, device=accelerator.device))
 
     for pm in model_reg.parameters():
         pm.requires_grad = False
@@ -201,7 +209,6 @@ def main():
 
     # sample data
     if accelerator.is_main_process:
-        data_restruct(dms_id=dataset)
         sample_data(dataset, args.sample_seed, int(config['shot']))
         split_train(dataset)
 
@@ -258,6 +265,15 @@ def main():
             accelerator.wait_for_everyone()
             unwrapped_model = accelerator.unwrap_model(model)
             unwrapped_model.save_pretrained(save_path)
+            
+            # if accelerator.is_main_process:
+            #     torch.save({
+            #         'A': A.state_dict(),
+            #         'b': b.state_dict(),
+            #         'A2': A2.state_dict(),
+            #         'b2': b2.state_dict()
+            #     }, os.path.join(save_path, 'spurs_params.pth'))
+            
         if sr == 1.0:
             accelerator.print(f'========early stop at epoch{epoch}!============')
             break
@@ -285,6 +301,22 @@ def main():
         tokenizer = EsmTokenizer.from_pretrained('facebook/esm1b_t33_650M_UR50S')
 
     # basemodel = PsiFit(esm_model, spurs_ddg, aa_token_ids)
+    
+    # spurs_params_path = os.path.join(save_path, 'spurs_params.pth')
+    # spurs_state = torch.load(spurs_params_path, map_location=accelerator.device)
+    # A = nn.Parameter(torch.tensor(0.1, device=accelerator.device))
+    # A.load_state_dict(spurs_state['A'])
+    # b = nn.Parameter(torch.tensor(0.1, device=accelerator.device))
+    # b.load_state_dict(spurs_state['b'])
+    # A2 = nn.Parameter(torch.tensor(0.1, device=accelerator.device))
+    # A2.load_state_dict(spurs_state['A2'])
+    # b2 = nn.Parameter(torch.tensor(0.1, device=accelerator.device))
+    # b2.load_state_dict(spurs_state['b2'])
+    
+    # A.requires_grad_(False)
+    # b.requires_grad_(False)
+    # A2.requires_grad_(False)
+    # b2.requires_grad_(False)
     
     model = PeftModel.from_pretrained(basemodel, save_path)
     model = accelerator.prepare(model)
