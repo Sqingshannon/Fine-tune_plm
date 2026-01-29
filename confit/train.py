@@ -29,10 +29,6 @@ class PsiFit(nn.Module):
         self.esm = esm_model
         device = next(self.esm.parameters()).device
         self.A = nn.Parameter(torch.tensor(0.1))
-        self.b = nn.Parameter(torch.tensor(0.1))
-        
-        self.A2 = nn.Parameter(torch.tensor(0.1))
-        self.b2 = nn.Parameter(torch.tensor(0.1))
         
         self.spurs_ddg = spurs_ddg.to(device)
         self.aa_token_ids = aa_token_ids
@@ -43,14 +39,12 @@ class PsiFit(nn.Module):
 
         seq_len = input_ids.shape[1] - 2
         aligned_ddg = self.spurs_ddg.unsqueeze(0).to(logits.device)
-        scaled_ddg = self.A * aligned_ddg + self.b
+        scaled_ddg = self.A * aligned_ddg
         
         aligned_logits = logits[:, 1:seq_len+1, self.aa_token_ids]
         adjusted_logits = aligned_logits + scaled_ddg
         
-        aligned_logits = self.A2 * adjusted_logits + self.b2
-        
-        logits[:, 1:seq_len+1, self.aa_token_ids] = aligned_logits
+        logits[:, 1:seq_len+1, self.aa_token_ids] = adjusted_logits
         outputs.logits = logits
         return outputs
 

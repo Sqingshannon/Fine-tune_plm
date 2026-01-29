@@ -75,7 +75,8 @@ def compute_score(model, seq, mask, wt, pos, tokenizer, spurs_ddg, aa_token_ids)
     scaled_ddg = A * aligned_ddg
     aligned_logits = logits[:, 1:seq_len + 1, aa_token_ids]
     # print("aligned_logits shape:", aligned_logits.shape)
-    adjusted_logits = aligned_logits + scaled_ddg
+    adjusted_logits = scaled_ddg
+    # adjusted_logits = aligned_logits + scaled_ddg
     # aligned_logits = A2 * adjusted_logits + b2
     logits[:, 1:seq_len + 1, aa_token_ids] = adjusted_logits
     
