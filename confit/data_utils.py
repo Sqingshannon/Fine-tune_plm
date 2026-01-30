@@ -41,9 +41,10 @@ class Mutation_Set(Dataset):
             for u in temp:
                 pos = [int(v) for v in u]
                 self.position.append(pos)
+        self.mutation_id = torch.tensor(np.arange(len(self.data)))
 
     def __getitem__(self, idx):
-        return [self.seq[idx], self.attention_mask[idx], self.target[idx],self.tgt_mask[idx] ,self.position[idx], self.score[idx], self.pid[idx]]
+        return [self.seq[idx], self.attention_mask[idx], self.target[idx],self.tgt_mask[idx] ,self.position[idx], self.score[idx], self.pid[idx], self.mutation_id[idx]]
 
     def __len__(self):
         return len(self.score)
@@ -56,7 +57,8 @@ class Mutation_Set(Dataset):
         pos = [torch.tensor(u[4]) for u in data]
         score = torch.tensor(np.array([u[5] for u in data]), dtype=torch.float32)
         pid = torch.tensor(np.array([u[6] for u in data]))
-        return seq, att_mask, tgt, tgt_mask, pos, score, pid
+        mutation = torch.tensor(np.array([u[7] for u in data]))
+        return seq, att_mask, tgt, tgt_mask, pos, score, pid, mutation
 
 
 def sample_data(dataset_name, seed, shot, frac=0.2):

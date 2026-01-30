@@ -44,11 +44,14 @@ def compute_score(model, seq, mask, wt, pos, tokenizer, spurs_ddg, aa_token_ids)
     out = model(mask_seq, mask, output_hidden_states=True)
     logits = out.logits
     
-    A = 1
+    # if conditionin on model mode 
+    
+    
+    # A = 1
     # b = 0.1
     # A2 = 0.1
     # b2 = 0.1
-    A = torch.tensor(A).to(device)
+    # A = torch.tensor(A).to(device)
     # b = torch.tensor(b).to(device)
     # A2 = torch.tensor(A2).to(device)
     # b2 = torch.tensor(b2).to(device)
@@ -58,27 +61,27 @@ def compute_score(model, seq, mask, wt, pos, tokenizer, spurs_ddg, aa_token_ids)
     # # A2 = A2.to(device)
     # # b2 = b2.to(device)
     
-    seq_len = mask_seq.shape[1] - 2
+    # seq_len = mask_seq.shape[1] - 2
     
-    # out.logits.shape == [2, 1024, 20]
+    # # out.logits.shape == [2, 1024, 20]
     
-    # print("spurs_ddg shape:", spurs_ddg.shape)
-    # if spurs_ddg.shape[0] != seq_len:
-    #     if spurs_ddg.shape[0] < seq_len:
-    #         pad_size = seq_len - spurs_ddg.shape[0]
-    #         spurs_ddg = F.pad(spurs_ddg, (0, 0, 0, pad_size), mode='constant', value=0.0)
-    #     else:
-    #         spurs_ddg = spurs_ddg[:seq_len, :]
+    # # print("spurs_ddg shape:", spurs_ddg.shape)
+    # # if spurs_ddg.shape[0] != seq_len:
+    # #     if spurs_ddg.shape[0] < seq_len:
+    # #         pad_size = seq_len - spurs_ddg.shape[0]
+    # #         spurs_ddg = F.pad(spurs_ddg, (0, 0, 0, pad_size), mode='constant', value=0.0)
+    # #     else:
+    # #         spurs_ddg = spurs_ddg[:seq_len, :]
     
-    aligned_ddg = spurs_ddg.unsqueeze(0).expand(batch_size, -1, -1).to(device)
-    # print("aligned_ddg shape:", aligned_ddg.shape)
-    scaled_ddg = A * aligned_ddg
-    aligned_logits = logits[:, 1:seq_len + 1, aa_token_ids]
-    # print("aligned_logits shape:", aligned_logits.shape)
-    adjusted_logits = scaled_ddg
-    # adjusted_logits = aligned_logits + scaled_ddg
-    # aligned_logits = A2 * adjusted_logits + b2
-    logits[:, 1:seq_len + 1, aa_token_ids] = adjusted_logits
+    # aligned_ddg = spurs_ddg.unsqueeze(0).expand(batch_size, -1, -1).to(device)
+    # # print("aligned_ddg shape:", aligned_ddg.shape)
+    # scaled_ddg = A * aligned_ddg
+    # aligned_logits = logits[:, 1:seq_len + 1, aa_token_ids]
+    # # print("aligned_logits shape:", aligned_logits.shape)
+    # adjusted_logits = scaled_ddg
+    # # adjusted_logits = aligned_logits + scaled_ddg
+    # # aligned_logits = A2 * adjusted_logits + b2
+    # logits[:, 1:seq_len + 1, aa_token_ids] = adjusted_logits
     
     # print("logits after spurs adjustment used")
     

@@ -82,6 +82,7 @@ def evaluate(model, testloader, tokenizer, accelerator, spurs_ddg, aa_token_ids,
     seq_list = []
     score_list = []
     gscore_list = []
+    mutation_list = []
     with torch.no_grad():
         for step, data in enumerate(testloader):
             seq, mask = data[0], data[1]
@@ -100,10 +101,19 @@ def evaluate(model, testloader, tokenizer, accelerator, spurs_ddg, aa_token_ids,
             score = score.cuda()
             score = accelerator.gather(score)
             golden_score = accelerator.gather(golden_score)
+            mutation = accelerator.gather(data[7])
             score = np.asarray(score.cpu())
             golden_score = np.asarray(golden_score.cpu())
+            mutation = np.asarray(mutation.cpu())
             score_list.extend(score)
             gscore_list.extend(golden_score)
+            mutation_list.extend(mutation)
+        
+            
+            # print(data[7])
+            # print("mutation_list", mutation_list)
+            # if step == 5:
+            #     exit(1)
     score_list = np.asarray(score_list)
     gscore_list = np.asarray(gscore_list)
     sr = spearman(score_list, gscore_list)
@@ -111,7 +121,7 @@ def evaluate(model, testloader, tokenizer, accelerator, spurs_ddg, aa_token_ids,
     if istest:
         seq_list = np.asarray(seq_list)
 
-        return sr, score_list, seq_list
+        return sr, score_list, gscore_list, seq_list, mutation_list
     else:
         return sr
 
@@ -168,6 +178,8 @@ def main():
     spurs_ddg = pd.read_csv(f'data/{dataset}/spurs_prediction.tsv', sep='\t', index_col=0)
     spurs_ddg = torch.tensor(spurs_ddg.values, dtype=torch.float32)
     
+    # A = nn.Parameter(torch.tensor(0.1))
+    
     # esm_model = basemodel
     # basemodel = PsiFit(esm_model, spurs_ddg, aa_token_ids)
     
@@ -201,6 +213,8 @@ def main():
 
     accelerator.print(f'===================dataset:{dataset}, preparing data=============')
 
+    # A = A.to(accelerator.device)
+
     # sample data
     if accelerator.is_main_process:
         sample_data(dataset, args.sample_seed, int(config['shot']))
@@ -223,7 +237,7 @@ def main():
     valset = Mutation_Set(data=val_csv, fname=dataset,  tokenizer=tokenizer)
     with accelerator.main_process_first():
         trainloader = DataLoader(trainset, batch_size=batch_size, collate_fn=trainset.collate_fn, shuffle=True)
-        testloader = DataLoader(testset, batch_size=2, collate_fn=testset.collate_fn)
+        testloader = DataLoader(testset, batch_size=2, collate_fn=testset.collate_fn, shuffle=False) #shuffle=False
         valloader = DataLoader(valset, batch_size=2, collate_fn=testset.collate_fn)
 
     trainloader = accelerator.prepare(trainloader)
@@ -314,8 +328,10 @@ def main():
     
     model = PeftModel.from_pretrained(basemodel, save_path)
     model = accelerator.prepare(model)
-    sr, score, pid = evaluate(model, testloader, tokenizer, accelerator, spurs_ddg, aa_token_ids, istest=True)
-    pred_csv = pd.DataFrame({f'{args.model_seed}': score, 'PID': pid})
+    sr, score, gscore, pid, mutation_list = evaluate(model, testloader, tokenizer, accelerator, spurs_ddg, aa_token_ids, istest=True)
+    # print("mutation_list:", mutation_list)
+    # print("len of pid:", len(pid), "len of mutation_list:", len(mutation_list), "len of score:", len(score), "len of gscore:", len(gscore))
+    pred_csv = pd.DataFrame({f'{args.model_seed}': score, 'mutation': mutation_list, "y_true": gscore})
     if accelerator.is_main_process:
         if not os.path.isdir(f'predicted/{dataset}'):
             os.makedirs(f'predicted/{dataset}')
