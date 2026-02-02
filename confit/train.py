@@ -184,9 +184,6 @@ def main():
     # basemodel = PsiFit(esm_model, spurs_ddg, aa_token_ids)
     
     # A = nn.Parameter(torch.tensor(0.1, device=accelerator.device))
-    # b = nn.Parameter(torch.tensor(0.1, device=accelerator.device))
-    # A2 = nn.Parameter(torch.tensor(0.1, device=accelerator.device))
-    # b2 = nn.Parameter(torch.tensor(0.1, device=accelerator.device))
 
     for pm in model_reg.parameters():
         pm.requires_grad = False
@@ -314,17 +311,8 @@ def main():
     # spurs_state = torch.load(spurs_params_path, map_location=accelerator.device)
     # A = nn.Parameter(torch.tensor(0.1, device=accelerator.device))
     # A.load_state_dict(spurs_state['A'])
-    # b = nn.Parameter(torch.tensor(0.1, device=accelerator.device))
-    # b.load_state_dict(spurs_state['b'])
-    # A2 = nn.Parameter(torch.tensor(0.1, device=accelerator.device))
-    # A2.load_state_dict(spurs_state['A2'])
-    # b2 = nn.Parameter(torch.tensor(0.1, device=accelerator.device))
-    # b2.load_state_dict(spurs_state['b2'])
     
     # A.requires_grad_(False)
-    # b.requires_grad_(False)
-    # A2.requires_grad_(False)
-    # b2.requires_grad_(False)
     
     model = PeftModel.from_pretrained(basemodel, save_path)
     model = accelerator.prepare(model)
