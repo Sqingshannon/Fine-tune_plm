@@ -20,7 +20,7 @@ def compute_stat(sr):
     return mean, std
 
 
-def compute_score(model, seq, mask, wt, pos, tokenizer, spurs_ddg, aa_token_ids):
+def compute_score(model, seq, mask, wt, pos, tokenizer):
     '''
     compute mutational proxy using masked marginal probability
     :param seq:mutant seq
@@ -48,18 +48,8 @@ def compute_score(model, seq, mask, wt, pos, tokenizer, spurs_ddg, aa_token_ids)
     
     
     # A = 1
-    # b = 0.1
-    # A2 = 0.1
-    # b2 = 0.1
-    # A = torch.tensor(A).to(device)
-    # b = torch.tensor(b).to(device)
-    # A2 = torch.tensor(A2).to(device)
-    # b2 = torch.tensor(b2).to(device)
     
     # # A = A.to(device)
-    # # b = b.to(device)
-    # # A2 = A2.to(device)
-    # # b2 = b2.to(device)
     
     # seq_len = mask_seq.shape[1] - 2
     

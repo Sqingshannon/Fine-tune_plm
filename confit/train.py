@@ -48,7 +48,7 @@ class PsiFit(nn.Module):
         outputs.logits = logits
         return outputs
 
-def train(model, model_reg, trainloder, optimizer, tokenizer, lambda_reg, spurs_ddg, aa_token_ids):
+def train(model, model_reg, trainloder, optimizer, tokenizer, lambda_reg):
 
     model.train()
 
@@ -59,7 +59,7 @@ def train(model, model_reg, trainloder, optimizer, tokenizer, lambda_reg, spurs_
         wt, wt_mask = data[2], data[3]
         pos = data[4]
         golden_score = data[5]
-        score, logits = compute_score(model, seq, mask, wt, pos, tokenizer, spurs_ddg, aa_token_ids)
+        score, logits = compute_score(model, seq, mask, wt, pos, tokenizer)
         score = score.cuda()
 
         l_BT = BT_loss(score, golden_score)
@@ -77,7 +77,7 @@ def train(model, model_reg, trainloder, optimizer, tokenizer, lambda_reg, spurs_
     return total_loss
 
 
-def evaluate(model, testloader, tokenizer, accelerator, spurs_ddg, aa_token_ids, istest=False):
+def evaluate(model, testloader, tokenizer, accelerator, istest=False):
     model.eval()
     seq_list = []
     score_list = []
@@ -96,7 +96,7 @@ def evaluate(model, testloader, tokenizer, accelerator, spurs_ddg, aa_token_ids,
                 for s in pid:
                     seq_list.append(s.cpu())
 
-            score, logits = compute_score(model, seq, mask, wt, pos, tokenizer, spurs_ddg, aa_token_ids)
+            score, logits = compute_score(model, seq, mask, wt, pos, tokenizer)
 
             score = score.cuda()
             score = accelerator.gather(score)
@@ -172,11 +172,11 @@ def main():
         model_reg = EsmForMaskedLM.from_pretrained('facebook/esm1b_t33_650M_UR50S')
         tokenizer = EsmTokenizer.from_pretrained('facebook/esm1b_t33_650M_UR50S')
 
-    aa_tokens = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y']
-    aa_token_ids = tokenizer.convert_tokens_to_ids(aa_tokens)
-    aa_token_ids = torch.tensor(aa_token_ids)
-    spurs_ddg = pd.read_csv(f'data/{dataset}/spurs_prediction.tsv', sep='\t', index_col=0)
-    spurs_ddg = torch.tensor(spurs_ddg.values, dtype=torch.float32)
+    # aa_tokens = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y']
+    # aa_token_ids = tokenizer.convert_tokens_to_ids(aa_tokens)
+    # aa_token_ids = torch.tensor(aa_token_ids)
+    # spurs_ddg = pd.read_csv(f'data/{dataset}/spurs_prediction.tsv', sep='\t', index_col=0)
+    # spurs_ddg = torch.tensor(spurs_ddg.values, dtype=torch.float32)
     
     # A = nn.Parameter(torch.tensor(0.1))
     
@@ -250,9 +250,9 @@ def main():
     best_epoch = 0
 
     for epoch in range(int(config['max_epochs'])):
-        loss = train(model, model_reg, trainloader, optimizer, tokenizer, float(config['lambda_reg']), spurs_ddg, aa_token_ids)
+        loss = train(model, model_reg, trainloader, optimizer, tokenizer, float(config['lambda_reg']))
         accelerator.print(f'========epoch{epoch}; training loss :{loss}=================')
-        sr = evaluate(model, valloader, tokenizer, accelerator, spurs_ddg, aa_token_ids)
+        sr = evaluate(model, valloader, tokenizer, accelerator)
         accelerator.print(f'========epoch{epoch}; val spearman correlation :{sr}=================')
         scheduler.step()
         if best_sr > sr:
@@ -316,7 +316,7 @@ def main():
     
     model = PeftModel.from_pretrained(basemodel, save_path)
     model = accelerator.prepare(model)
-    sr, score, gscore, pid, mutation_list = evaluate(model, testloader, tokenizer, accelerator, spurs_ddg, aa_token_ids, istest=True)
+    sr, score, gscore, pid, mutation_list = evaluate(model, testloader, tokenizer, accelerator, istest=True)
     # print("mutation_list:", mutation_list)
     # print("len of pid:", len(pid), "len of mutation_list:", len(mutation_list), "len of score:", len(score), "len of gscore:", len(gscore))
     pred_csv = pd.DataFrame({f'{args.model_seed}': score, 'mutation': mutation_list, "y_true": gscore})
