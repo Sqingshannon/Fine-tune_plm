@@ -64,10 +64,11 @@ class CoeffNN(nn.Module):
         return a_i 
     
 class AModule(nn.Module):
-    def __init__(self, mode, spurs_ddg_shape, a_init=-1.0, hidden_size=20, combined_way=None):
+    def __init__(self, mode, spurs_ddg_shape, a_init, hidden_size=20, combined_way=None):
         super(AModule, self).__init__()
         self.mode = mode
         self.combined_way = combined_way
+        # print("a init:", a_init)
         if self.mode == 'single':
             self.A = nn.Parameter(torch.tensor(a_init))
         elif self.mode == 'position-specific':
@@ -206,7 +207,8 @@ def main():
     a_init = args.a_init
     combined_way = args.combined_way
     
-    data_restruct(dms_id=dataset)
+    data_restruct(dms_id=dataset, seed=args.sample_seed, a_type=a_type, a_init=a_init, combined_way=combined_way)
+    # exit(1)
     
     np.random.seed(args.sample_seed)
     random.seed(args.sample_seed)
@@ -335,7 +337,8 @@ def main():
                 if accelerator.is_main_process:
                     os.makedirs(f'checkpoint/{dataset}')
             save_path = os.path.join('checkpoint', f'{dataset}',
-                                     f'seed{args.model_seed}')
+                                     f'seed{args.model_seed}',
+                                     f'mode{a_type}_ainit{a_init}_combined{combined_way}_epoch{epoch}_sr{sr:.6f}')
             accelerator.wait_for_everyone()
             unwrapped_model = accelerator.unwrap_model(model)
             unwrapped_model.save_pretrained(save_path)
@@ -393,15 +396,17 @@ def main():
     # print("mutation_list:", mutation_list)
     # print("len of pid:", len(pid), "len of mutation_list:", len(mutation_list), "len of score:", len(score), "len of gscore:", len(gscore))
     pred_csv = pd.DataFrame({f'{args.model_seed}': score, 'mutation': mutation_list, "y_true": gscore})
+    # pred_save_path = f'predicted/{dataset}/seed{args.model_seed}_mode{a_type}_ainit{a_init}_combined{combined_way}'
+    pred_save_path = f'predicted/{dataset}'
     if accelerator.is_main_process:
-        if not os.path.isdir(f'predicted/{dataset}'):
-            os.makedirs(f'predicted/{dataset}')
-        if os.path.exists(f'predicted/{dataset}/pred.csv'):
-            pred = pd.read_csv(f'predicted/{dataset}/pred.csv', index_col=0)
+        if not os.path.isdir(pred_save_path):
+            os.makedirs(pred_save_path)
+        if os.path.exists(pred_save_path / 'pred.csv'):
+            pred = pd.read_csv(pred_save_path / 'pred.csv', index_col=0)
             pred = pd.merge(pred, pred_csv, on='PID')
         else:
             pred = pred_csv
-        pred.to_csv(f'predicted/{dataset}/pred.csv')
+        pred.to_csv(pred_save_path / 'pred.csv')
     accelerator.print(f'=============the test spearman correlation for early stop: {sr}==================')
 
 
