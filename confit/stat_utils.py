@@ -32,81 +32,68 @@ def compute_score(model, seq, mask, wt, pos, tokenizer, A, spurs_ddg, aa_token_i
         logits: output logits for masked sequence
     '''
     device = seq.device
-
+    bs = seq.shape[0]
+    
+    # pos starts from 0, as mutated_position in data.csv
+    pos_list = [p[0].item() if p.numel() == 1 else p[0].item() for p in pos]
+    pos = torch.tensor(pos_list, dtype=torch.long, device=device)
+    
     mask_seq = seq.clone()
-    m_id = tokenizer.mask_token_id
-
-    batch_size = int(seq.shape[0])
-    for i in range(batch_size):
-        mut_pos = pos[i]
-        mask_seq[i, mut_pos+1] = m_id
-
+    mask_seq[torch.arange(bs, device=device), pos + 1] = tokenizer.mask_token_id
+    
     out = model(mask_seq, mask, output_hidden_states=True)
     logits = out.logits
-    log_probs = torch.log_softmax(logits, dim=-1)
-    scores = torch.zeros(batch_size)
-    scores = scores.to(device)
     
-    token_to_aa_idx = {aa_token_ids[j].item(): j for j in range(len(aa_token_ids))}
-    
-    if A.combined_way == "logits":
-        # print("We do combine by logits")
+    if A is not None and A.combined_way == "logits":
         seq_len = mask_seq.shape[1] - 2
-        aligned_ddg = spurs_ddg.unsqueeze(0).expand(batch_size, -1, -1).to(device)
-        aligned_logits = logits[:, 1:seq_len + 1, aa_token_ids]
+        aligned_ddg = spurs_ddg.unsqueeze(0).expand(bs, -1, -1).to(device)
+        aligned_logits = logits[:, 1:seq_len +1, aa_token_ids]
         
-        if A.mode == 'single':
-            scaled_ddg = A.A * aligned_ddg
-        elif A.mode == 'position-specific':
-            scaled_ddg = A.A.unsqueeze(0).unsqueeze(-1) * aligned_ddg
-        elif A.mode == 'context-specific':
-            flat_esm = aligned_ddg.reshape(-1, 20)
+        if A.mode == "single":
+            scaled_ddg = A.A * aligned_logits
+        elif A.mode == "position-specific":
+            a = A.A.unsqueeze(0).unsqueeze(2).expand(bs, -1, -1).to(device)
+            scaled_ddg = a * aligned_ddg
+        elif A.mode == "context-specific":
+            flat_esm = aligned_logits.reshape(-1, 20)
             flat_ddg = aligned_ddg.reshape(-1, 20)
             a = A(flat_esm, flat_ddg)
-            a = a.reshape(batch_size, seq_len, 1)
+            a = a.reshape(bs, seq_len, 1)
             scaled_ddg = a * aligned_ddg
+            
+        logits[:, 1:seq_len +1, aa_token_ids] += scaled_ddg
         
-        adjusted_logits = aligned_logits + scaled_ddg
-        logits[:, 1:seq_len + 1, aa_token_ids] = adjusted_logits
-    elif A.combined_way == "scores":
-        # print("We do combine by scores")
-        logits = logits
-    else:
-        raise ValueError(f"Invalid combined_way 1st: {A.combined_way}")
+    log_probs = torch.log_softmax(logits, dim=-1)
     
-
-    for i in range(batch_size):
-
-        mut_pos = pos[i]
-        score_i = log_probs[i]
-        wt_i = wt[i]
-        seq_i = seq[i]
-        scores[i] = torch.sum(score_i[mut_pos+1, seq_i[mut_pos+1]])-torch.sum(score_i[mut_pos+1, wt_i[mut_pos+1]])
+    batch_idx = torch.arange(bs, device=device)
+    p = pos + 1
+    
+    mut_token = seq[batch_idx, p]
+    wt_token = wt[batch_idx, p]
+    
+    logp_mut = log_probs[batch_idx, p, mut_token]
+    logp_wt = log_probs[batch_idx, p, wt_token]
+    scores = logp_mut - logp_wt
+    
+    if A is not None and A.combined_way == "scores":
+        aa_token_ids = aa_token_ids.to(device)        
+        mut_idx = (aa_token_ids == mut_token.unsqueeze(1)).nonzero(as_tuple=True)[1]
         
-        if A.combined_way == "scores":
-            # print("second check we do combine by scores")
-            if A.mode == 'context-specific':
-                esm_i = score_i[mut_pos+1, aa_token_ids]
-                ddg_i = spurs_ddg[mut_pos, :]
-                a_i = A(esm_i, ddg_i)
-            
-            mut_token = seq_i[mut_pos+1].item()
-            aa_idx = token_to_aa_idx.get(mut_token)
-            if aa_idx is not None:
-                spurs_score_i = spurs_ddg[mut_pos, aa_idx].item()
-                
-                if A.mode == 'single':
-                    scores[i] += A.A * spurs_score_i
-                elif A.mode == 'position-specific':
-                    scores[i] += A.A[mut_pos] * spurs_score_i
-                elif A.mode == 'context-specific':
-                    scores[i] += (a_i * spurs_score_i).item()
-        elif A.combined_way == "logits":
-            # print("second check we do combine by logits")
-            pass
+        ddg_value = spurs_ddg[pos, mut_idx]
+        
+        if A.mode == "single":
+            a = A.A.expand(bs).to(device)
+        elif A.mode == "position-specific":
+            a = A(mut_pos=pos).to(device)
+        elif A.mode == "context-specific":
+            esm_i = logits[batch_idx, p]
+            esm_i = esm_i[:, aa_token_ids]
+            ddg_i = spurs_ddg[pos]
+            a = A(esm_i, ddg_i).squeeze(-1)
         else:
-            raise ValueError(f"Invalid combined_way 2nd: {A.combined_way}")
+            a = torch.ones(bs, device=device)
             
+        scores += a * ddg_value
             
     return scores, logits
 

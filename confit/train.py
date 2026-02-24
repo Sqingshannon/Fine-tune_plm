@@ -72,7 +72,7 @@ class AModule(nn.Module):
         if self.mode == 'single':
             self.A = nn.Parameter(torch.tensor(a_init))
         elif self.mode == 'position-specific':
-            self.A = nn.Parameter(torch.full((spurs_ddg_shape[0],), a_init))
+            self.A = nn.Parameter(torch.full((spurs_ddg_shape[0],), a_init))  
         elif self.mode == 'context-specific':
             self.lin1 = nn.Linear(20, hidden_size)
             self.lin2 = nn.Linear(hidden_size, hidden_size)
@@ -190,25 +190,22 @@ def evaluate(model, testloader, tokenizer, accelerator, A, spurs_ddg, aa_token_i
 
 def main():
     parser = argparse.ArgumentParser(description='ConFit train, set hyperparameters')
-    parser.add_argument('--config', type=str, default='48shot_config.yaml',
+    parser.add_argument('--config', type=str, required=True,
                         help='the config file name')
     parser.add_argument('--dataset', type=str, help='the dataset name')
     parser.add_argument('--sample_seed', type=int, default=0, help='the sample seed for dataset')
     parser.add_argument('--model_seed', type=int, default=1, help='the random seed for the pretrained model initiate')
-    parser.add_argument('--a_type', type=str, default=None, help='the type of A, none, single or position-specific or context-specific')
-    parser.add_argument('--a_init', type=float, default=-1.0, help='the initial value of A, only used when A_type is single or position-specific')
-    parser.add_argument('--combined_way', type=str, default=None, help='the way to combine esm and ddg for context-specific A, score or feature')
-
+    parser.add_argument('--a_type', type=str, help='the type of A, none, single or position-specific or context-specific')
+    parser.add_argument('--a_init', type=float, help='the initial value of A, only used when A_type is single or position-specific')
+    parser.add_argument('--combined_way', type=str, help='the way to combine esm and ddg for context-specific A, score or feature')
+    parser.add_argument('--train_mode', type=str, help='full = joint ConFit training (default), a_only = train ONLY A module')
+    
     args, _ = parser.parse_known_args()
     dataset = args.dataset
-    # print("dataset:", dataset)
-    # exit(1)
     a_type = args.a_type
     a_init = args.a_init
     combined_way = args.combined_way
-    
-    data_restruct(dms_id=dataset, seed=args.sample_seed, a_type=a_type, a_init=a_init, combined_way=combined_way)
-    # exit(1)
+    train_mode = args.train_mode
     
     np.random.seed(args.sample_seed)
     random.seed(args.sample_seed)
@@ -216,16 +213,19 @@ def main():
     torch.cuda.manual_seed_all(args.model_seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+    
+    batch_size = int(int(config['batch_size'])/int(config['gpu_number']))
+    
+    accelerator = Accelerator()
+    # accelerator.set_seed(args.model_seed)
+    
+    if accelerator.is_main_process:
+        data_restruct(dms_id=dataset, seed=args.model_seed, a_type=a_type, a_init=a_init, combined_way=combined_way, train_mode=train_mode)
+    accelerator.wait_for_everyone()
 
     #read in config
     with open(f'{args.config}', 'r', encoding='utf-8') as f:
         config = yaml.load(f.read(), Loader=yaml.FullLoader)
-
-    batch_size = int(int(config['batch_size'])/int(config['gpu_number']))
-
-
-    accelerator = Accelerator()
-    # accelerator.set_seed(args.model_seed)
 
     ### creat model
     if config['model'] == 'ESM-1v':
@@ -265,16 +265,12 @@ def main():
     )
 
     model = get_peft_model(basemodel, peft_config)
-    
-    optimizer = torch.optim.Adam(list(model.parameters()) + list(A.parameters()), lr=float(config['ini_lr']))
-    
-    # if a_type == "single" or a_type == "position-specific":
-    #     optimizer = torch.optim.Adam(list(model.parameters()) + [A], lr=float(config['ini_lr']))
-    # elif a_type == "context-specific":
-    #     optimizer = torch.optim.Adam(list(model.parameters()) + list(A.parameters()), lr=float(config['ini_lr']))
-    # else:
-    #     optimizer = torch.optim.Adam(model.parameters(), lr=float(config['ini_lr']))
-    
+
+    optimizer = torch.optim.Adam(
+        list(model.parameters()) + list(A.parameters()),
+        lr=float(config['ini_lr'])
+    )
+      
     scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=2*int(config['max_epochs']), eta_min=float(config['min_lr']))
     if os.environ.get("ACCELERATE_USE_FSDP", None) is not None:
         accelerator.state.fsdp_plugin.auto_wrap_policy = fsdp_auto_wrap_policy(model)
@@ -314,8 +310,14 @@ def main():
     accelerator.print('==============data preparing done!================')
     # accelerator.print("Current allocated memory:", torch.cuda.memory_allocated())
     # accelerator.print("cached:", torch.cuda.memory_reserved())
-
-
+    save_dir = Path('checkpoint', f'{dataset}',
+                                     f'seed{args.model_seed}',
+                                     f'mode{a_type}_ainit{a_init}_combined{combined_way}_trainmode{args.train_mode}')
+    
+    if args.train_mode == "full":
+        accelerator.print("========start full LoRA + A training!============")
+        
+    
     best_sr = -np.inf
     endure = 0
     best_epoch = 0
@@ -338,7 +340,7 @@ def main():
                     os.makedirs(f'checkpoint/{dataset}')
             save_path = os.path.join('checkpoint', f'{dataset}',
                                      f'seed{args.model_seed}',
-                                     f'mode{a_type}_ainit{a_init}_combined{combined_way}_epoch{epoch}_sr{sr:.6f}')
+                                     f'mode{a_type}_ainit{a_init}_combined{combined_way}_trainmode{args.train_mode}')
             accelerator.wait_for_everyone()
             unwrapped_model = accelerator.unwrap_model(model)
             unwrapped_model.save_pretrained(save_path)
@@ -358,7 +360,7 @@ def main():
 
     # inference on the test sest
     accelerator.print('=======training done!, test the performance!========')
-    save_path = Path(os.path.join('checkpoint', f'{dataset}', f'seed{args.model_seed}'))
+    save_path = Path(os.path.join('checkpoint', f'{dataset}', f'seed{args.model_seed}'), f'mode{a_type}_ainit{a_init}_combined{combined_way}_trainmode{args.train_mode}')
     del basemodel
     del model
     accelerator.free_memory()
@@ -396,8 +398,8 @@ def main():
     # print("mutation_list:", mutation_list)
     # print("len of pid:", len(pid), "len of mutation_list:", len(mutation_list), "len of score:", len(score), "len of gscore:", len(gscore))
     pred_csv = pd.DataFrame({f'{args.model_seed}': score, 'mutation': mutation_list, "y_true": gscore})
-    # pred_save_path = f'predicted/{dataset}/seed{args.model_seed}_mode{a_type}_ainit{a_init}_combined{combined_way}'
-    pred_save_path = f'predicted/{dataset}'
+    pred_save_path = Path(f'predicted/{dataset}/seed{args.model_seed}_mode{a_type}_ainit{a_init}_combined{combined_way}_trainmode{args.train_mode}')
+    # pred_save_path = f'predicted/{dataset}'
     if accelerator.is_main_process:
         if not os.path.isdir(pred_save_path):
             os.makedirs(pred_save_path)
