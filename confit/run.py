@@ -26,22 +26,36 @@ df = pd.DataFrame(data)
 df = df[~df['dms_id'].str.contains("Tsuboyama")]
 df.sort_values(by='seq_length', ascending=True, inplace=True)
 
-num_datasets = 5
-short_df = df.head(num_datasets).reset_index(drop=True)
-# short_df = df[df['seq_length'] <= 1022].copy().reset_index(drop=True)
+# num_datasets = 1
+# short_df = df.head(num_datasets).reset_index(drop=True)
+short_df = df[df['seq_length'] <= 1022].copy().reset_index(drop=True)
+num_datasets = len(short_df)
 
 print("=" * 80)
 print(f"Found {len(short_df)} datasets with seq_length < 1022")
 print(short_df[['dms_id', 'seq_length']].to_string(index=False))
 print("=" * 80)
 
-a_types       = ["single", "position-specific", "context-specific"]
+a_types       = ["none", "single", "position-specific", "context-specific"]
 a_inits       = [0.1, -1.0]
 combined_ways = ["logits", "scores"]
+train_modes   = ["full", "a_only"]
 
-combinations = list(itertools.product(a_types, a_inits, combined_ways))
+combinations = list(itertools.product(a_types, a_inits, combined_ways, train_modes))
 
-total_runs = len(short_df) * len(combinations)
+filtered_combinations = []
+for combo in combinations:
+    a_type, a_init, combined_way, train_mode = combo
+    
+    if a_type == "none":
+        if combined_way == "scores" and train_mode == "full":
+            filtered_combinations.append(combo)
+    else:
+        filtered_combinations.append(combo)
+
+print(f"Total valid combinations after filtering: {len(filtered_combinations)}\n")
+
+total_runs = len(short_df) * len(filtered_combinations)
 global_run = 0
 
 for idx, row in short_df.iterrows():
@@ -50,14 +64,15 @@ for idx, row in short_df.iterrows():
     
     print(f"\n{'='*100}")
     print(f"DATASET {idx+1}/{len(short_df)} → {dms_id} (len={length})")
-    print(f"Running {len(combinations)} combinations")
+    print(f"Running {len(filtered_combinations)} combinations")
     print(f"{'='*100}\n")
     
     for combo in combinations:
-        a_type, a_init, combined_way = combo
+        a_type, a_init, combined_way, train_mode = combo
         global_run += 1
         
-        print(f"  [{global_run}/{total_runs}] → a_type={a_type} | a_init={a_init} | combined_way={combined_way}")
+        print(f"  [{global_run}/{total_runs}] → a_type={a_type} | a_init={a_init} | "
+              f"combined_way={combined_way} | train_mode={train_mode}")
         
         cmd = [
             "accelerate", "launch",
@@ -68,6 +83,7 @@ for idx, row in short_df.iterrows():
             "--a_type",        a_type,
             "--a_init",        str(a_init),
             "--combined_way",  combined_way,
+            "--train_mode",    train_mode, 
             "--sample_seed", "0",
             "--model_seed", "1",
         ]
