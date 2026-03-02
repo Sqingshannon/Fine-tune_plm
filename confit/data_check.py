@@ -4,12 +4,14 @@ import pandas as pd
 import os
 from Bio import SeqIO
 
-def data_restruct(dms_id, seed, a_type, a_init, combined_way, input_dir=Path("/work/yunan/PsiFit/data/proteingym"), output_base=Path("./data")):
-    # predicted_dir = Path("./predicted") / dms_id / f'seed{seed}_mode{a_type}_ainit{a_init}_combined{combined_way}'
-    predicted_dir = Path("./predicted") / dms_id
+def data_restruct(dms_id, seed, a_type, a_init, combined_way, train_mode, input_dir=Path("/work/yunan/PsiFit/data/proteingym"), output_base=Path("./data")):
+    predicted_dir = Path("./predicted") / dms_id / f'seed{seed}_mode{a_type}_ainit{a_init}_combined{combined_way}_trainmode{train_mode}'
+    # predicted_dir = Path("./predicted") / dms_id
     if predicted_dir.exists():
         # print("pred exists")
         shutil.rmtree(predicted_dir)
+        # print(f"Removed existing directory: {predicted_dir}")
+        # exit(1)
     else:
         print(f"{predicted_dir} in predicted does not exist, no need to remove.")
     

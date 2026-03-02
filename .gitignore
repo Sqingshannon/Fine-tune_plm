@@ -159,3 +159,20 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 A4GRB6_PSEAI_Chen_2020/
+
+# ML/Datasets and Generated Files
+data/              # Ignore entire 'data' folder (or whatever your dataset dir is called)
+datasets/          # Common alternative name
+*.pkl              # Pickle files (e.g., serialized datasets or models)
+*.h5               # HDF5 files (e.g., Keras/TF models or large arrays)
+*.pt               # PyTorch model checkpoints
+*.pth              # PyTorch weights
+*.npy              # NumPy arrays (binary data files)
+*.npz              # Compressed NumPy files
+checkpoints/       # Folder for training checkpoints
+logs/              # Training logs (e.g., TensorBoard or custom logs)
+results/           # Output directories from experiments
+*.csv              # If you have large generated CSVs; skip if you want to track small ones
+*.parquet          # Parquet files for big data
+wandb/             # If using Weights & Biases for experiment tracking
+mlruns/            # If using MLflow
