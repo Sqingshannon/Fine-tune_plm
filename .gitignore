@@ -172,6 +172,7 @@ datasets/          # Common alternative name
 *.bin
 checkpoint/       # Folder for training checkpoints
 checkpoints/
+predicted/
 logs/              # Training logs (e.g., TensorBoard or custom logs)
 results/           # Output directories from experiments
 *.csv              # If you have large generated CSVs; skip if you want to track small ones
