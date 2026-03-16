@@ -79,7 +79,7 @@ class AModule(nn.Module):
             self.lin3 = nn.Linear(hidden_size, 1)
             self.relu = nn.ReLU()
         elif self.mode == "none":
-            self.A = None
+            self.A = torch.zeros(1)
         else:
             raise ValueError(f'Invalid mode: {mode}')
         
@@ -199,7 +199,8 @@ def main():
     parser.add_argument('--a_init', type=float, help='the initial value of A, only used when A_type is single or position-specific')
     parser.add_argument('--combined_way', type=str, help='the way to combine esm and ddg for context-specific A, score or feature')
     parser.add_argument('--train_mode', type=str, help='full = joint ConFit training (default), a_only = train ONLY A module')
-    
+    parser.add_argument('--shot', type=int, default=None, help='override shot value from config')
+
     args, _ = parser.parse_known_args()
     dataset = args.dataset
     a_type = args.a_type
@@ -220,6 +221,7 @@ def main():
         config = yaml.load(f.read(), Loader=yaml.FullLoader)
     
     batch_size = int(int(config['batch_size'])/int(config['gpu_number']))
+    shot = args.shot if args.shot is not None else int(config['shot'])
     
     accelerator = Accelerator()
     # accelerator.set_seed(args.model_seed)
@@ -266,7 +268,8 @@ def main():
     )
 
     model = get_peft_model(basemodel, peft_config)
-    
+    # model.gradient_checkpointing_enable()
+
     # if os.environ.get("ACCELERATE_USE_FSDP", None) is not None:
     #     accelerator.state.fsdp_plugin.auto_wrap_policy = fsdp_auto_wrap_policy(model)
     
@@ -307,14 +310,19 @@ def main():
     # accelerator.print("Current allocated memory:", torch.cuda.memory_allocated())
     # accelerator.print("cached:", torch.cuda.memory_reserved())
     save_dir = Path('checkpoint', f'{dataset}',
+                                     f'shot{shot}',
                                      f'seed{args.model_seed}',
                                      f'mode{a_type}_ainit{a_init}_combined{combined_way}_trainmode{args.train_mode}')
     
     if args.train_mode == "full":
         accelerator.print("========start full LoRA + A training!============")
         
-        for p in A.parameters():
-            p.requires_grad = True
+        if A.mode == "none":
+            for p in A.parameters():
+                p.requires_grad = False
+        else:
+            for p in A.parameters():
+                p.requires_grad = True
             
         optimizer = torch.optim.AdamW(
             list(model.parameters()) + list(A.parameters()), 
@@ -341,7 +349,10 @@ def main():
                 accelerator.wait_for_everyone()
                 unwrapped_model = accelerator.unwrap_model(model)
                 unwrapped_model.save_pretrained(save_dir)
-                accelerator.save(A.state_dict(), save_dir / 'A.pth')
+                if A.mode != "none":
+                    accelerator.save(A.state_dict(), save_dir / 'A.pth')
+                else:
+                    pass
             else:
                 endure += 1
                 
@@ -368,7 +379,7 @@ def main():
                          float(config['lambda_reg']), A, spurs_ddg, aa_token_ids, accelerator)
             
             accelerator.print(f'========Stage 1 epoch{epoch}; training loss :{loss:.4f}=================')
-            sr = evaluate(model, valloader, tokenizer, accelerator, A=None, spurs_ddg=spurs_ddg, aa_token_ids=aa_token_ids)
+            sr = evaluate(model, valloader, tokenizer, accelerator, A=A, spurs_ddg=spurs_ddg, aa_token_ids=aa_token_ids)
             accelerator.print(f'========Stage 1 epoch{epoch}; val SR :{sr:.4f}=================')
             scheduler.step()
             
@@ -455,8 +466,9 @@ def main():
     
     
     A = AModule(mode=a_type, spurs_ddg_shape=spurs_ddg.shape, a_init=a_init, combined_way=combined_way).to(accelerator.device)
-    A.load_state_dict(torch.load(save_dir / "A.pth", map_location=accelerator.device))
-    A.requires_grad_(False)
+    if A.mode != "none":
+        A.load_state_dict(torch.load(save_dir / "A.pth", map_location=accelerator.device))
+        A.requires_grad_(False)
     # if a_type == 'single':
     #     A.data = torch.load(os.path.join(save_path, 'A.pth'), map_location=accelerator.device)
     #     A.requires_grad_(False)
@@ -477,7 +489,7 @@ def main():
     # print("mutation_list:", mutation_list)
     # print("len of pid:", len(pid), "len of mutation_list:", len(mutation_list), "len of score:", len(score), "len of gscore:", len(gscore))
     pred_csv = pd.DataFrame({f'{args.model_seed}': score, 'mutation': mutation_list, "y_true": gscore})
-    pred_save_path = Path(f'predicted/{dataset}/seed{args.model_seed}_mode{a_type}_ainit{a_init}_combined{combined_way}_trainmode{args.train_mode}')
+    pred_save_path = Path(f'predicted/{dataset}/shot{shot}_seed{args.model_seed}_mode{a_type}_ainit{a_init}_combined{combined_way}_trainmode{args.train_mode}')
     # pred_save_path = f'predicted/{dataset}'
     if accelerator.is_main_process:
         # if not os.path.isdir(pred_save_path):

@@ -1,6 +1,6 @@
 model: ESM-1v
-gpu_number: 4
-shot: 96
+gpu_number: 3
+shot: 64
 batch_size: 16
 max_epochs: 30
 ini_lr: 5e-4

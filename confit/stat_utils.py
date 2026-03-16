@@ -50,7 +50,7 @@ def compute_score(model, seq, mask, wt, pos, tokenizer, A, spurs_ddg, aa_token_i
         aligned_logits = logits[:, 1:seq_len +1, aa_token_ids]
         
         if A.mode == "single":
-            scaled_ddg = A.A * aligned_logits
+            scaled_ddg = A.A * aligned_ddg
         elif A.mode == "position-specific":
             a = A.A.unsqueeze(0).unsqueeze(2).expand(bs, -1, -1).to(device)
             scaled_ddg = a * aligned_ddg
@@ -75,7 +75,7 @@ def compute_score(model, seq, mask, wt, pos, tokenizer, A, spurs_ddg, aa_token_i
     logp_wt = log_probs[batch_idx, p, wt_token]
     scores = logp_mut - logp_wt
     
-    if A is not None and A.combined_way == "scores":
+    if A.combined_way == "scores":
         aa_token_ids = aa_token_ids.to(device)        
         mut_idx = (aa_token_ids == mut_token.unsqueeze(1)).nonzero(as_tuple=True)[1]
         
@@ -90,8 +90,8 @@ def compute_score(model, seq, mask, wt, pos, tokenizer, A, spurs_ddg, aa_token_i
             esm_i = esm_i[:, aa_token_ids]
             ddg_i = spurs_ddg[pos]
             a = A(esm_i, ddg_i).squeeze(-1)
-        else:
-            a = torch.ones(bs, device=device)
+        elif A.mode == "none":
+            a = A.A.expand(bs).to(device)
             
         scores += a * ddg_value
             
@@ -103,7 +103,7 @@ def BT_loss(scores, golden_score):
     loss = torch.tensor(0.)
     loss = loss.cuda()
     for i in range(len(scores)):
-        for j in range(i, len(scores)):
+        for j in range(i+1, len(scores)):
             if golden_score[i] > golden_score[j]:
                 loss += torch.log(1+torch.exp(scores[j]-scores[i]))
             else:
