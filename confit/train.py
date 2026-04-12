@@ -200,6 +200,8 @@ def main():
     parser.add_argument('--combined_way', type=str, help='the way to combine esm and ddg for context-specific A, score or feature')
     parser.add_argument('--train_mode', type=str, help='full = joint ConFit training (default), a_only = train ONLY A module')
     parser.add_argument('--shot', type=int, default=None, help='override shot value from config')
+    
+    parser.add_argument('--run_suffix', type=str, default='rerun_fixed')
 
     args, _ = parser.parse_known_args()
     dataset = args.dataset
@@ -226,8 +228,19 @@ def main():
     accelerator = Accelerator()
     # accelerator.set_seed(args.model_seed)
     
+    # if accelerator.is_main_process:
+    #     data_restruct(dms_id=dataset, seed=args.model_seed, a_type=a_type, a_init=a_init, combined_way=combined_way, train_mode=train_mode)
     if accelerator.is_main_process:
-        data_restruct(dms_id=dataset, seed=args.model_seed, a_type=a_type, a_init=a_init, combined_way=combined_way, train_mode=train_mode)
+        data_restruct(
+            dms_id=dataset, 
+            seed=args.model_seed, 
+            a_type=a_type, 
+            a_init=a_init, 
+            combined_way=combined_way, 
+            train_mode=train_mode,
+            output_base=Path(f'data_{args.run_suffix}')   # ← changed
+        )
+    
     accelerator.wait_for_everyone()
 
     ### creat model
@@ -279,16 +292,37 @@ def main():
     accelerator.print(f'===================dataset:{dataset}, preparing data=============')
 
     # sample data
+    # if accelerator.is_main_process:
+    #     test_csv_path = Path(f'data/{dataset}/test.csv')
+    #     if not test_csv_path.exists():
+    #         sample_data(dataset, args.sample_seed, args.shot)
+    #         split_train(dataset)
+
+    # with accelerator.main_process_first():
+    #     train_csv = pd.DataFrame(None)
+    #     test_csv = pd.read_csv(f'data/{dataset}/test.csv')
+    #     val_csv = None
+    #     for i in range(1, 6):
+    #         temp_csv = pd.read_csv(f'data/{dataset}/train_{i}.csv')
+    #         if i == args.model_seed:
+    #             val_csv = temp_csv
+    #         else:
+    #             train_csv = pd.concat([train_csv, temp_csv], axis=0)
     if accelerator.is_main_process:
-        sample_data(dataset, args.sample_seed, int(config['shot']))
-        split_train(dataset)
+        data_root = Path(f'data_{args.run_suffix}')
+        test_csv_path = data_root / dataset / 'test.csv'
+        
+        if not test_csv_path.exists():
+            sample_data(dataset, args.sample_seed, args.shot, data_root=data_root)
+            split_train(dataset, data_root=data_root)
 
     with accelerator.main_process_first():
+        data_root = Path(f'data_{args.run_suffix}')
         train_csv = pd.DataFrame(None)
-        test_csv = pd.read_csv(f'data/{dataset}/test.csv')
+        test_csv = pd.read_csv(data_root / dataset / 'test.csv')
         val_csv = None
         for i in range(1, 6):
-            temp_csv = pd.read_csv(f'data/{dataset}/train_{i}.csv')
+            temp_csv = pd.read_csv(data_root / dataset / f'train_{i}.csv')
             if i == args.model_seed:
                 val_csv = temp_csv
             else:
@@ -309,10 +343,15 @@ def main():
     accelerator.print('==============data preparing done!================')
     # accelerator.print("Current allocated memory:", torch.cuda.memory_allocated())
     # accelerator.print("cached:", torch.cuda.memory_reserved())
-    save_dir = Path('checkpoint', f'{dataset}',
-                                     f'shot{shot}',
-                                     f'seed{args.model_seed}',
-                                     f'mode{a_type}_ainit{a_init}_combined{combined_way}_trainmode{args.train_mode}')
+    # save_dir = Path('checkpoint', f'{dataset}',
+    #                                  f'shot{shot}',
+    #                                  f'seed{args.model_seed}',
+    #                                  f'mode{a_type}_ainit{a_init}_combined{combined_way}_trainmode{args.train_mode}')
+    
+    save_dir = Path(f'checkpoint_{args.run_suffix}', f'{dataset}',
+                    f'shot{shot}',
+                    f'seed{args.model_seed}',
+                    f'mode{a_type}_ainit{a_init}_combined{combined_way}_trainmode{args.train_mode}')
     
     if args.train_mode == "full":
         accelerator.print("========start full LoRA + A training!============")
@@ -489,7 +528,10 @@ def main():
     # print("mutation_list:", mutation_list)
     # print("len of pid:", len(pid), "len of mutation_list:", len(mutation_list), "len of score:", len(score), "len of gscore:", len(gscore))
     pred_csv = pd.DataFrame({f'{args.model_seed}': score, 'mutation': mutation_list, "y_true": gscore})
-    pred_save_path = Path(f'predicted/{dataset}/shot{shot}_seed{args.model_seed}_mode{a_type}_ainit{a_init}_combined{combined_way}_trainmode{args.train_mode}')
+    # pred_save_path = Path(f'predicted/{dataset}/shot{shot}_seed{args.model_seed}_mode{a_type}_ainit{a_init}_combined{combined_way}_trainmode{args.train_mode}')
+    pred_save_path = Path(f'predicted_{args.run_suffix}', f'{dataset}',
+                          f'shot{shot}_seed{args.model_seed}_mode{a_type}_ainit{a_init}_combined{combined_way}_trainmode{args.train_mode}')
+    
     # pred_save_path = f'predicted/{dataset}'
     if accelerator.is_main_process:
         # if not os.path.isdir(pred_save_path):

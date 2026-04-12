@@ -175,7 +175,12 @@ checkpoints/
 predicted/
 logs/              # Training logs (e.g., TensorBoard or custom logs)
 results/           # Output directories from experiments
+data_return_fixed/
 *.csv              # If you have large generated CSVs; skip if you want to track small ones
+*.xlsx
 *.parquet          # Parquet files for big data
 wandb/             # If using Weights & Biases for experiment tracking
 mlruns/            # If using MLflow
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
