@@ -168,6 +168,7 @@ datasets/          # Common alternative name
 *.pt               # PyTorch model checkpoints
 *.pth              # PyTorch weights
 *.npy              # NumPy arrays (binary data files)
+*.pkl
 *.npz              # Compressed NumPy files
 *.bin
 checkpoint/       # Folder for training checkpoints
@@ -178,9 +179,15 @@ results/           # Output directories from experiments
 data_return_fixed/
 *.csv              # If you have large generated CSVs; skip if you want to track small ones
 *.xlsx
+*.tsv
 *.parquet          # Parquet files for big data
 wandb/             # If using Weights & Biases for experiment tracking
 mlruns/            # If using MLflow
 .ipynb_checkpoints/
+*.ipynb_checkpoints
+
 __pycache__/
 *.pyc
+
+.DS_Store
+Thumbs.db
