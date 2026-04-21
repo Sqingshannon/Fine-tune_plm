@@ -169,14 +169,15 @@ datasets/          # Common alternative name
 *.pth              # PyTorch weights
 *.npy              # NumPy arrays (binary data files)
 *.pkl
-*.npz              # Compressed NumPy files
+*.npz              # Compressed NumPy filess
 *.bin
 checkpoint/       # Folder for training checkpoints
 checkpoints/
 predicted/
+predicted_rerun_fixed/
 logs/              # Training logs (e.g., TensorBoard or custom logs)
 results/           # Output directories from experiments
-data_return_fixed/
+data_rerun_fixed/
 *.csv              # If you have large generated CSVs; skip if you want to track small ones
 *.xlsx
 *.tsv
