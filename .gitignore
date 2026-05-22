@@ -163,6 +163,7 @@ A4GRB6_PSEAI_Chen_2020/
 # ML/Datasets and Generated Files
 data/              # Ignore entire 'data' folder (or whatever your dataset dir is called)
 datasets/          # Common alternative name
+results/           # CSV, output results
 *.pkl              # Pickle files (e.g., serialized datasets or models)
 *.h5               # HDF5 files (e.g., Keras/TF models or large arrays)
 *.pt               # PyTorch model checkpoints
