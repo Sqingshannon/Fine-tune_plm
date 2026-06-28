@@ -172,7 +172,11 @@ results/           # CSV, output results
 *.pkl
 *.npz              # Compressed NumPy filess
 *.bin
+data/
+data_rerun_fixed/
+fitness/
 checkpoint/       # Folder for training checkpoints
+checkpoint_rerun_fixed/
 checkpoints/
 predicted/
 predicted_rerun_fixed/
