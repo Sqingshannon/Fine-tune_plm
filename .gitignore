@@ -173,6 +173,7 @@ results/           # CSV, output results
 *.npz              # Compressed NumPy filess
 *.bin
 data/
+data.tar.gz
 data_rerun_fixed/
 fitness/
 checkpoint/       # Folder for training checkpoints
