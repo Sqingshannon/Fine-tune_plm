@@ -11,6 +11,7 @@ The runner reads dataset metadata, builds the combination grid, and launches
 from __future__ import annotations
 
 import itertools
+import os
 import subprocess
 import sys
 import time
@@ -40,6 +41,7 @@ class RunMode(str, Enum):
         RERUN_ALL_FAILED: Re-run all missing combinations.
         RERUN_ALLNONE_FAILED: Re-run failed none+scores+full datasets.
         CHECK_STATUS: Print missing combination status and exit.
+        SELECTED: Run a fixed hand-picked subset of combinations.
     """
 
     MAIN = "main"
@@ -48,6 +50,7 @@ class RunMode(str, Enum):
     RERUN_ALL_FAILED = "rerun_all_failed"
     RERUN_ALLNONE_FAILED = "rerun_allnone_failed"
     CHECK_STATUS = "check_status"
+    SELECTED = "selected"
 
 
 @dataclass
@@ -60,6 +63,9 @@ class RunnerConfig:
         run_suffix: Suffix appended to ``checkpoint_`` and ``predicted_`` dirs.
         quarter: Dataset quarter index (1–4) to process.
         shot: Number of training examples (k-shot).
+        model_seeds: List of model seeds to run; each seed holds out a different
+            validation fold.  Running seeds 1–5 gives cross-validated results on
+            the same fixed test set.
         mode: Operating mode controlling which combos are run.
         check_shot: Shot count used in check_status mode.
         max_datasets: Limit to the first N datasets (for quick testing).
@@ -75,6 +81,7 @@ class RunnerConfig:
     run_suffix: str = "rerun_fixed"
     quarter: int = 1
     shot: int = 96
+    model_seeds: List[int] = field(default_factory=lambda: [1])
     mode: RunMode = RunMode.MAIN
     check_shot: int = 96
     max_datasets: Optional[int] = None
@@ -265,6 +272,16 @@ class ExperimentRunner:
         if mode == RunMode.CHECK_STATUS:
             return base_combos, self.config.check_shot, False
 
+        if mode == RunMode.SELECTED:
+            selected: List[Combo] = [
+                # ("position-specific", -1.0, "logits", "full"),
+                # ("single",            -1.0, "logits", "a_only"),
+                ("position-specific", -1.0, "scores", "full"),
+                # ("position-specific", -1.0, "scores", "a_only"),
+                # ("none",               0.1, "scores", "full"),
+            ]
+            return selected, self.config.shot, True
+
         raise ValueError(f"Unsupported RunMode: {mode!r}")
 
     # ------------------------------------------------------------------
@@ -331,7 +348,8 @@ class ExperimentRunner:
             shot: k-shot size for this run.
             skip_done: If ``True``, silently skip completed combinations.
         """
-        total_runs = len(df) * len(combos)
+        model_seeds = self.config.model_seeds
+        total_runs = len(df) * len(combos) * len(model_seeds)
         global_run = 0
 
         for idx, row in df.iterrows():
@@ -339,40 +357,42 @@ class ExperimentRunner:
             length = row["seq_length"]
             print(f"\n{'='*100}")
             print(f"DATASET {idx+1}/{len(df)} → {dms_id} (len={length})")
-            print(f"Running {len(combos)} combinations")
+            print(f"Running {len(combos)} combinations × {len(model_seeds)} model seed(s)")
             print(f"{'='*100}\n")
 
             for combo in combos:
-                global_run += 1
-                a_type, a_init, combined_way, train_mode = combo
+                for model_seed in model_seeds:
+                    global_run += 1
+                    a_type, a_init, combined_way, train_mode = combo
 
-                if skip_done and self._is_combo_done(dms_id, shot, 1, combo):
+                    if skip_done and self._is_combo_done(dms_id, shot, model_seed, combo):
+                        print(
+                            f"  [{global_run}/{total_runs}] → SKIP (already done): "
+                            f"seed={model_seed} | a_type={a_type} | a_init={a_init} | "
+                            f"combined_way={combined_way} | train_mode={train_mode}"
+                        )
+                        continue
+
                     print(
-                        f"  [{global_run}/{total_runs}] → SKIP (already done): "
+                        f"  [{global_run}/{total_runs}] → seed={model_seed} | "
                         f"a_type={a_type} | a_init={a_init} | "
                         f"combined_way={combined_way} | train_mode={train_mode}"
                     )
-                    continue
-
-                print(
-                    f"  [{global_run}/{total_runs}] → a_type={a_type} | "
-                    f"a_init={a_init} | combined_way={combined_way} | "
-                    f"train_mode={train_mode}"
-                )
-                self._launch_one(dms_id, shot, combo)
-                time.sleep(self.config.sleep_between_runs)
+                    self._launch_one(dms_id, shot, combo, model_seed)
+                    time.sleep(self.config.sleep_between_runs)
 
         print("\n" + "=" * 80)
         print(f"FINISHED! Ran {global_run} trainings on {len(df)} datasets.")
         print("=" * 80)
 
-    def _launch_one(self, dms_id: str, shot: int, combo: Combo) -> None:
+    def _launch_one(self, dms_id: str, shot: int, combo: Combo, model_seed: int) -> None:
         """Launch a single training run as a subprocess.
 
         Args:
             dms_id: Dataset identifier.
             shot: k-shot count.
             combo: ``(a_type, a_init, combined_way, train_mode)`` tuple.
+            model_seed: Validation fold index (1–5).
         """
         a_type, a_init, combined_way, train_mode = combo
         cfg = self.config
@@ -388,12 +408,21 @@ class ExperimentRunner:
             "--combined_way", combined_way,
             "--train_mode",   train_mode,
             "--sample_seed",  "0",
-            "--model_seed",   "1",
+            "--model_seed",   str(model_seed),
             "--shot",         str(shot),
             "--run_suffix",   cfg.run_suffix,
         ]
+        # numpy/pandas (imported transitively for dataset indexing) make MKL's
+        # C runtime call setenv("MKL_THREADING_LAYER", "INTEL") directly,
+        # bypassing os.environ. subprocess.run(env=None) inherits that real
+        # OS-level value, and the forced INTEL layer then fatally conflicts
+        # with libgomp inside the training subprocess (PyTorch/transformers),
+        # crashing it before any output. Pass an explicit env without it so
+        # the child can fall back to a compatible threading layer on its own.
+        env = os.environ.copy()
+        env.pop("MKL_THREADING_LAYER", None)
         try:
-            subprocess.run(cmd, check=True, capture_output=False)
+            subprocess.run(cmd, check=True, capture_output=False, env=env)
             print("SUCCESS\n")
         except subprocess.CalledProcessError as exc:
             print(f"FAILED (code {exc.returncode})\n")

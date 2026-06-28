@@ -25,6 +25,10 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--run_suffix",    type=str, default="rerun_fixed")
     p.add_argument("--max_datasets",  type=int, default=None)
     p.add_argument("--last_datasets", type=int, default=None)
+    p.add_argument(
+        "--model_seeds", type=int, nargs="+", default=[1],
+        help="Validation fold indices to run (1–5). Pass multiple for CV, e.g. --model_seeds 1 2 3 4 5",
+    )
     return p.parse_args()
 
 
@@ -38,6 +42,7 @@ if __name__ == "__main__":
         run_suffix=args.run_suffix,
         max_datasets=args.max_datasets,
         last_datasets=args.last_datasets,
+        model_seeds=args.model_seeds,
         base_dir=Path("."),
     )
     ExperimentRunner(cfg).run()

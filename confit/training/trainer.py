@@ -288,11 +288,13 @@ class ConFitTrainer(BaseTrainer):
         """
         self.accelerator.wait_for_everyone()
         unwrapped = self.accelerator.unwrap_model(self.model)
-        unwrapped.save_pretrained(save_dir)
-        if self.a_module.mode != ScalingMode.NONE:
-            self.accelerator.save(
-                self.a_module.state_dict(), save_dir / "A.pth"
-            )
+        if self.accelerator.is_main_process:
+            unwrapped.save_pretrained(save_dir)
+            if self.a_module.mode != ScalingMode.NONE:
+                self.accelerator.save(
+                    self.a_module.state_dict(), save_dir / "A.pth"
+                )
+        self.accelerator.wait_for_everyone()
 
     def _load_stage1(self, stage1_dir: Path) -> Any:
         """Reload Stage-1 LoRA checkpoint and prepare with Accelerator.

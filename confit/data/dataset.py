@@ -61,7 +61,7 @@ class MutationDataset(Dataset):
         self.attention_mask: List[List[int]] = encoded_mut["attention_mask"]
 
         wt_path = os.path.join(data_root, fname, "wt.fasta")
-        wt_seq = str(next(SeqIO.parse(wt_path, "fasta")).seq)
+        wt_seq = str(next(SeqIO.parse(wt_path, "fasta")).seq)  
         encoded_wt = tokenizer(
             [wt_seq] * len(self.data),
             padding=False,

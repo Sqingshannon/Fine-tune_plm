@@ -68,17 +68,14 @@ def main() -> None:
     shot = args.shot if args.shot is not None else cfg.shot
     accelerator = Accelerator()
 
-    # --- Data loading from the pre-built data/ directory ---
-    # data_root = Path(f"data_{args.run_suffix}")  # old: generate/copy splits per run
-    # if accelerator.is_main_process:
-    #     preprocessor = DataPreprocessor(output_base=data_root)
-    #     preprocessor.prepare(args.dataset)
-    # accelerator.wait_for_everyone()
-    # splitter = DataSplitter(data_root=data_root)
-    # if accelerator.is_main_process:
-    #     splitter.ensure_splits_exist(args.dataset, seed=args.sample_seed, shot=shot)
-    # accelerator.wait_for_everyone()
-    data_root = Path("data")  # use the pre-built data/ directory directly
+    # --- Generate seed/shot-specific splits under data_rerun_fixed/{dataset}/seed_{model_seed}_shot{shot}/ ---
+    data_root = Path("data_rerun_fixed")
+    splitter = DataSplitter(data_root=data_root, source_dir=data_root)
+    if accelerator.is_main_process:
+        splitter.ensure_splits_exist(
+            args.dataset, test_seed=0, model_seed=args.model_seed, shot=shot
+        )
+    accelerator.wait_for_everyone()
 
     # --- Build model bundle ---
     variant = ModelRegistry.from_string(cfg.model)
@@ -90,7 +87,7 @@ def main() -> None:
 
     # Load SPURS DDG from data/ (same directory as all other data)
     spurs_ddg = pd.read_csv(
-        f"data/{args.dataset}/spurs_prediction.tsv", sep="\t", index_col=0
+        f"data_rerun_fixed/{args.dataset}/spurs_prediction.tsv", sep="\t", index_col=0
     )
     spurs_ddg_tensor = torch.tensor(
         spurs_ddg.values, dtype=torch.float32
@@ -113,12 +110,13 @@ def main() -> None:
     accelerator.print(f"=======dataset:{args.dataset}, preparing data==========")
     per_device_bs = cfg.per_device_batch_size
 
+    seed_dir = splitter.seed_dir(args.dataset, args.model_seed, shot)
     with accelerator.main_process_first():
-        test_csv = pd.read_csv(data_root / args.dataset / "test.csv")
+        test_csv = pd.read_csv(seed_dir / "test.csv")
         train_csv = pd.DataFrame()
         val_csv: Optional[pd.DataFrame] = None
         for i in range(1, 6):
-            temp = pd.read_csv(data_root / args.dataset / f"train_{i}.csv")
+            temp = pd.read_csv(seed_dir / f"train_{i}.csv")
             if i == args.model_seed:
                 val_csv = temp
             else:

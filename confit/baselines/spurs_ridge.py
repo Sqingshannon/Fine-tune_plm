@@ -320,6 +320,85 @@ class SpursRidgeBaseline:
             n_repeats=n_repeats, random_seed=random_seed, alpha=alpha
         )
 
+    def run_with_fixed_splits(
+        self,
+        data_dir: Path,
+        fitness_dir: Path,
+        model_seed: int = 1,
+    ) -> EvalResult:
+        """Run Ridge on the same pre-built train/test splits used by PsiFit.
+
+        Loads ``train_{1..5}.csv`` and ``test.csv`` from *data_dir*, looks up
+        each row's PLL and SPURS score by its original integer index (the
+        unnamed first column in the split CSVs), fits Ridge on the training
+        folds, and evaluates Spearman ρ on the test set.
+
+        Args:
+            data_dir: ``data_rerun_fixed/{dataset}/`` containing
+                ``train_*.csv``, ``test.csv``.
+            fitness_dir: ``fitness/proteingym_deepsequence/{dataset}/``
+                containing ``DeepSequence/pll.csv`` and ``spurs.pkl``.
+            model_seed: Which ``train_{i}.csv`` to hold out as validation
+                (matches the ``--model_seed`` passed to ``train_entry.py``).
+
+        Returns:
+            A single :class:`EvalResult` with ``std_spearman=0`` (no repeats
+            — the split is fixed).
+        """
+        import pandas as pd
+
+        pll_df = pd.read_csv(fitness_dir / "DeepSequence" / "pll.csv", index_col=0)
+        pll_series = pll_df["pll"]
+        pll_series.index = [int(s.replace("id_", "")) for s in pll_series.index]
+
+        with open(fitness_dir / "spurs.pkl", "rb") as fh:
+            spurs_list = pickle.load(fh)
+
+        train_parts = [
+            pd.read_csv(data_dir / f"train_{i}.csv", index_col=0)
+            for i in range(1, 6)
+            if i != model_seed
+        ]
+        train_df = pd.concat(train_parts)
+        test_df = pd.read_csv(data_dir / "test.csv", index_col=0)
+
+        def _to_records(df: "pd.DataFrame") -> List[MutantRecord]:
+            records = []
+            for idx, row in df.iterrows():
+                try:
+                    pid = int(row["PID"]) if "PID" in row else int(idx)
+                    seq = row["seq"] if "seq" in row.index else idx
+                    records.append(MutantRecord(
+                        seq=seq,
+                        target=float(row[self._loader.target_col]),
+                        pll=float(pll_series[pid]),
+                        spurs_ddg=float(spurs_list[pid]),
+                    ))
+                except (KeyError, IndexError):
+                    pass
+            return records
+
+        train_records = _to_records(train_df)
+        test_records = _to_records(test_df)
+        print(f"  train: {len(train_records)}  test: {len(test_records)}")
+
+        X_train, y_train = self._feature_builder.build(train_records)
+        X_test, y_test = self._feature_builder.build(test_records)
+        print(f"  X shape: {X_train.shape}  (L*20={X_train.shape[1]-2} + pll + spurs_ddg)")
+
+        model = Ridge(alpha=self._evaluator.alpha)
+        model.fit(X_train, y_train)
+        preds = model.predict(X_test)
+        rho, _ = spearmanr(y_test, preds)
+
+        print(f"  Spearman ρ on test: {rho:.4f}")
+        return EvalResult(
+            n_train=len(train_records),
+            mean_spearman=float(rho),
+            std_spearman=0.0,
+            raw=np.array([rho]),
+        )
+
     def run(
         self,
         data_path: Path,
@@ -353,7 +432,7 @@ class SpursRidgeBaseline:
     def run_all(
         self,
         data_dir: Path = Path("data"),
-        fitness_dir: Path = Path("data/fitness/proteingym_deepsequence"),
+        fitness_dir: Path = Path("fitness/proteingym_deepsequence"),
         verbose: bool = True,
     ) -> "pd.DataFrame":
         """Run the baseline on every dataset that has all three required files.
