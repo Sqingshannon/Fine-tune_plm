@@ -11,7 +11,7 @@ from typing import Any, Tuple
 
 from transformers import EsmForMaskedLM, EsmTokenizer
 
-from confit.models.registry import ModelRegistry, ModelVariant
+from psifit.models.registry import ModelRegistry, ModelVariant
 
 
 @dataclass

@@ -11,7 +11,7 @@ from typing import Union
 
 import yaml
 
-from confit.config.schema import TrainingConfig
+from psifit.config.schema import TrainingConfig
 
 
 class ConfigLoader:

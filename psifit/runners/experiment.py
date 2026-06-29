@@ -4,7 +4,7 @@ Replaces the ~270-line script-level code in the original ``run.py`` that
 executed at import time and hardcoded an absolute ``BASE`` path.
 
 The runner reads dataset metadata, builds the combination grid, and launches
-``accelerate launch confit/train_entry.py ...`` for each combination via
+``accelerate launch psifit/train_entry.py ...`` for each combination via
 ``subprocess``.  All path resolution is relative so the code is portable.
 """
 
@@ -88,7 +88,7 @@ class RunnerConfig:
     last_datasets: Optional[int] = None
     sleep_between_runs: float = 3.0
     accel_config: Path = Path("config/parallel_config.yaml")
-    train_script: Path = Path("confit/train_entry.py")
+    train_script: Path = Path("psifit/train_entry.py")
     training_config: Path = Path("config/training_config.yaml")
 
 

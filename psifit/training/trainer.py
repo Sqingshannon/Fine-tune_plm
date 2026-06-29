@@ -22,13 +22,13 @@ import torch
 from peft import PeftModel, LoraConfig, get_peft_model
 from torch.utils.data import DataLoader
 
-from confit.config.schema import TrainingConfig
-from confit.losses.bradley_terry import BradleyTerryLoss
-from confit.losses.kl_regularization import KLRegularizationLoss
-from confit.models.scaling import AModule, ScalingMode
-from confit.scoring.masked_marginal import MaskedMarginalScorer
-from confit.training.base import BaseTrainer
-from confit.training.evaluator import ConFitEvaluator, EvaluationResult
+from psifit.config.schema import TrainingConfig
+from psifit.losses.bradley_terry import BradleyTerryLoss
+from psifit.losses.kl_regularization import KLRegularizationLoss
+from psifit.models.scaling import AModule, ScalingMode
+from psifit.scoring.masked_marginal import MaskedMarginalScorer
+from psifit.training.base import BaseTrainer
+from psifit.training.evaluator import ConFitEvaluator, EvaluationResult
 
 
 class TrainMode(str, Enum):
@@ -47,12 +47,12 @@ class ConFitTrainer(BaseTrainer):
     """Trains an ESM model with LoRA and an optional SPURS scaling module.
 
     Args:
-        config: Validated :class:`~confit.config.schema.TrainingConfig`.
+        config: Validated :class:`~psifit.config.schema.TrainingConfig`.
         model: PEFT-wrapped ESM backbone (prepared by Accelerator).
         model_reg: Frozen reference ESM model (prepared by Accelerator).
-        a_module: :class:`~confit.models.scaling.AModule` instance.
-        scorer: :class:`~confit.scoring.masked_marginal.MaskedMarginalScorer`.
-        evaluator: :class:`~confit.training.evaluator.ConFitEvaluator`.
+        a_module: :class:`~psifit.models.scaling.AModule` instance.
+        scorer: :class:`~psifit.scoring.masked_marginal.MaskedMarginalScorer`.
+        evaluator: :class:`~psifit.training.evaluator.ConFitEvaluator`.
         accelerator: :class:`~accelerate.Accelerator` instance.
         train_mode: :class:`TrainMode` controlling the training strategy.
         tokenizer: ESM tokenizer.

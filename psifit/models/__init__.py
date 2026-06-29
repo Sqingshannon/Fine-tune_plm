@@ -1,8 +1,8 @@
 """Models subpackage — ESM factory, model registry, and scaling strategies."""
 
-from confit.models.registry import ModelVariant, ModelRegistry
-from confit.models.factory import BaseModelFactory, ESMModelFactory
-from confit.models.scaling import (
+from psifit.models.registry import ModelVariant, ModelRegistry
+from psifit.models.factory import BaseModelFactory, ESMModelFactory
+from psifit.models.scaling import (
     ScalingMode,
     BaseScalingStrategy,
     NoScalingStrategy,

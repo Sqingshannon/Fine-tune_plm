@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from confit.utils.cleanup import ArtifactCleaner
+from psifit.utils.cleanup import ArtifactCleaner
 
 
 if __name__ == "__main__":

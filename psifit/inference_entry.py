@@ -8,7 +8,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from confit.runners.inference import InferenceAggregator
+from psifit.runners.inference import InferenceAggregator
 
 
 def _parse_args() -> argparse.Namespace:

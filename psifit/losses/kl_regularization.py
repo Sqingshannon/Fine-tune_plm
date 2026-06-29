@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from confit.losses.base import BaseLoss
+from psifit.losses.base import BaseLoss
 
 
 class KLRegularizationLoss(BaseLoss):

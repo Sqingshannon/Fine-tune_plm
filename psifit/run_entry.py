@@ -1,7 +1,7 @@
 """Experiment orchestration CLI — thin wrapper around ExperimentRunner.
 
 Replaces the original ``run.py`` whose top-level code executed at import time.
-All logic now lives in :class:`~confit.runners.experiment.ExperimentRunner`.
+All logic now lives in :class:`~psifit.runners.experiment.ExperimentRunner`.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from confit.runners.experiment import ExperimentRunner, RunMode, RunnerConfig
+from psifit.runners.experiment import ExperimentRunner, RunMode, RunnerConfig
 
 
 def _parse_args() -> argparse.Namespace:

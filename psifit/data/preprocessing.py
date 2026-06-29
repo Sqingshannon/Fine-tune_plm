@@ -29,7 +29,7 @@ class DataPreprocessor:
                                seq, log_fitness, n_mut, mutant, PID,
                                mutated_position
 
-    ``sample_data`` / ``split_train`` in :mod:`confit.data.splitter` create the
+    ``sample_data`` / ``split_train`` in :mod:`psifit.data.splitter` create the
     actual ``test.csv`` and ``train_i.csv`` splits from ``data.csv`` at run time.
 
     Args:

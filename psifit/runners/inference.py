@@ -13,7 +13,7 @@ from typing import List, Optional
 import numpy as np
 import pandas as pd
 
-from confit.metrics.correlation import spearman
+from psifit.metrics.correlation import spearman
 
 
 class InferenceAggregator:

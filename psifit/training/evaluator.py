@@ -14,8 +14,8 @@ import torch
 from torch import Tensor
 from torch.utils.data import DataLoader
 
-from confit.metrics.correlation import spearman
-from confit.scoring.masked_marginal import MaskedMarginalScorer
+from psifit.metrics.correlation import spearman
+from psifit.scoring.masked_marginal import MaskedMarginalScorer
 
 
 @dataclass
@@ -45,7 +45,7 @@ class ConFitEvaluator:
     """Runs a full evaluation loop over a DataLoader and returns an EvaluationResult.
 
     Args:
-        scorer: :class:`~confit.scoring.masked_marginal.MaskedMarginalScorer`
+        scorer: :class:`~psifit.scoring.masked_marginal.MaskedMarginalScorer`
             that computes per-sample fitness proxies.
         accelerator: :class:`~accelerate.Accelerator` instance for distributed
             gather operations.

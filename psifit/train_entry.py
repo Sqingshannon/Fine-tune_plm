@@ -1,7 +1,7 @@
 """Training entry point — thin CLI wrapper around ConFitTrainer.
 
 This script is what ``accelerate launch`` calls.  All business logic lives in
-the ``confit`` package; this file only handles argument parsing, wiring up the
+the ``psifit`` package; this file only handles argument parsing, wiring up the
 components, and calling ``trainer.fit()``.
 """
 
@@ -21,17 +21,17 @@ from peft import PeftModel
 
 warnings.filterwarnings("ignore")
 
-from confit.config.loader import ConfigLoader
-from confit.data.dataset import MutationDataset
-from confit.data.preprocessing import DataPreprocessor
-from confit.data.splitter import DataSplitter
-from confit.models.factory import ESMModelFactory
-from confit.models.registry import ModelRegistry, ModelVariant
-from confit.models.scaling import AModule
-from confit.scoring.masked_marginal import MaskedMarginalScorer
-from confit.training.evaluator import ConFitEvaluator
-from confit.training.trainer import ConFitTrainer, TrainMode
-from confit.utils.seeding import seed_everything
+from psifit.config.loader import ConfigLoader
+from psifit.data.dataset import MutationDataset
+from psifit.data.preprocessing import DataPreprocessor
+from psifit.data.splitter import DataSplitter
+from psifit.models.factory import ESMModelFactory
+from psifit.models.registry import ModelRegistry, ModelVariant
+from psifit.models.scaling import AModule
+from psifit.scoring.masked_marginal import MaskedMarginalScorer
+from psifit.training.evaluator import ConFitEvaluator
+from psifit.training.trainer import ConFitTrainer, TrainMode
+from psifit.utils.seeding import seed_everything
 from torch.utils.data import DataLoader
 
 

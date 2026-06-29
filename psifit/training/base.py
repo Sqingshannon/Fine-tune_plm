@@ -12,7 +12,7 @@ class BaseTrainer(ABC):
     """Abstract base class for all ConFit trainers.
 
     Defines the minimal contract that every trainer must satisfy.
-    Concrete subclasses (e.g. :class:`~confit.training.trainer.ConFitTrainer`)
+    Concrete subclasses (e.g. :class:`~psifit.training.trainer.ConFitTrainer`)
     implement the full training logic.
     """
 

@@ -20,7 +20,7 @@
 set -uo pipefail
 
 # Run from the repo root regardless of where this script is invoked from --
-# all paths in confit/ (config/, data_rerun_fixed/, checkpoint_*/, predicted_*/)
+# all paths in psifit/ (config/, data_rerun_fixed/, checkpoint_*/, predicted_*/)
 # are relative to cwd.
 cd "$(dirname "$(readlink -f "$0")")"
 
@@ -36,7 +36,7 @@ run_job() {
     local pass=$4
     local logfile="$LOG_DIR/shot${shot}_q${quarter}.log"
     echo "  -> [GPUs $gpus] pass=$pass shot=$shot quarter=$quarter (log: $logfile)"
-    CUDA_VISIBLE_DEVICES="$gpus" python -m confit.run_entry \
+    CUDA_VISIBLE_DEVICES="$gpus" python -m psifit.run_entry \
         --quarter "$quarter" \
         --mode selected \
         --shot "$shot" \

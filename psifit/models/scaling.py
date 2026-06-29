@@ -100,7 +100,7 @@ class NoScalingStrategy(BaseScalingStrategy):
     """Pass-through strategy that contributes zero SPURS correction.
 
     Keeps a registered zero buffer so that ``AModule.combined_way`` branching
-    in :class:`~confit.scoring.masked_marginal.MaskedMarginalScorer` can
+    in :class:`~psifit.scoring.masked_marginal.MaskedMarginalScorer` can
     still call ``A.A`` without an AttributeError.
     """
 
@@ -251,8 +251,8 @@ class AModule(nn.Module):
     """Wrapper that composes a :class:`BaseScalingStrategy`.
 
     This class is the public-facing ``A`` object consumed by both the
-    :class:`~confit.scoring.masked_marginal.MaskedMarginalScorer` and the
-    :class:`~confit.training.trainer.ConFitTrainer`.  It exposes the same
+    :class:`~psifit.scoring.masked_marginal.MaskedMarginalScorer` and the
+    :class:`~psifit.training.trainer.ConFitTrainer`.  It exposes the same
     attributes (``mode``, ``combined_way``, ``A``) that the original code
     relied on, ensuring full backward compatibility.
 

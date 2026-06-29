@@ -30,7 +30,7 @@ class ModelRegistry:
     """Maps :class:`ModelVariant` values to HuggingFace model hub IDs.
 
     The registry is intentionally a thin data structure; actual model
-    construction is delegated to :class:`~confit.models.factory.ESMModelFactory`.
+    construction is delegated to :class:`~psifit.models.factory.ESMModelFactory`.
 
     Example:
         >>> hub_id = ModelRegistry.hub_id(ModelVariant.ESM_1V, model_seed=2)

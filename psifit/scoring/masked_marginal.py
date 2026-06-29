@@ -17,7 +17,7 @@ from typing import Any, List, Tuple
 import torch
 from torch import Tensor
 
-from confit.models.scaling import AModule, ScalingMode
+from psifit.models.scaling import AModule, ScalingMode
 
 
 class MaskedMarginalScorer:
@@ -33,7 +33,7 @@ class MaskedMarginalScorer:
 
     Args:
         tokenizer: HuggingFace ESM tokenizer (provides ``mask_token_id``).
-        a_module: :class:`~confit.models.scaling.AModule` instance.
+        a_module: :class:`~psifit.models.scaling.AModule` instance.
         spurs_ddg: SPURS DDG tensor, shape ``(L, 20)``.
         aa_token_ids: Token IDs for the 20 canonical amino acids, shape ``(20,)``.
 
