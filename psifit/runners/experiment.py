@@ -421,6 +421,15 @@ class ExperimentRunner:
         # the child can fall back to a compatible threading layer on its own.
         env = os.environ.copy()
         env.pop("MKL_THREADING_LAYER", None)
+        # accelerate launch runs train_script as a standalone script, so
+        # Python sets sys.path[0] to the script's own directory rather than
+        # the repo root, leaving the psifit package unimportable inside the
+        # subprocess. Prepend the repo root to PYTHONPATH so it resolves.
+        repo_root = str(Path(__file__).resolve().parents[2])
+        existing_path = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = (
+            repo_root if not existing_path else f"{repo_root}{os.pathsep}{existing_path}"
+        )
         try:
             subprocess.run(cmd, check=True, capture_output=False, env=env)
             print("SUCCESS\n")

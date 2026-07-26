@@ -9,9 +9,7 @@
 # of waiting on the others.
 #
 # GPU pinning (fixed for the whole run):
-#   q1 -> GPUs 0,1,2     q2 -> GPUs 0,1,2   (ALWAYS share, run concurrently)
-#   q3 -> GPUs 3,4,5     q4 -> GPUs 3,4,5   (ALWAYS share, run concurrently)
-#   GPUs 6,7 are unused.
+#   q3 -> GPUs 2,6,7     q4 -> GPUs 3,4,5   (different GPUs, run concurrently)
 #
 # RunMode.SELECTED already sets skip_done=True, so the rerun pass instantly
 # skips anything already completed and only retrains genuinely missing/
@@ -57,13 +55,11 @@ run_quarter_stream() {
     echo "=== quarter=$quarter (GPUs $gpus) fully done: both passes, all shots ==="
 }
 
-echo "##### Launching 4 independent quarter streams (no cross-quarter wait) #####"
+echo "##### Launching quarter 3 (GPUs 2,6,7) and quarter 4 (GPUs 3,4,5) concurrently #####"
 
-run_quarter_stream 1 "0,1,2" & pid1=$!
-run_quarter_stream 2 "0,1,2" & pid2=$!
-run_quarter_stream 3 "3,4,5" & pid3=$!
-run_quarter_stream 4 "3,4,5" & pid4=$!
+run_quarter_stream 3 "2,6,7" & pid1=$!
+run_quarter_stream 4 "3,4,5" & pid2=$!
 
-wait "$pid1" "$pid2" "$pid3" "$pid4"
+wait "$pid1" "$pid2"
 
 echo "##### Shot sweep complete. Check $LOG_DIR/ for per-quarter logs. #####"
